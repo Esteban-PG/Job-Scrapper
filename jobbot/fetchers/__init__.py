@@ -22,7 +22,7 @@ entrada en FETCHERS. Nada más se toca.
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
-from .phenom import fetch_pg
+from .phenom import fetch_cisco, fetch_pg, fetch_phenom
 from .workday import fetch_workday
 
 FETCHERS = {
@@ -31,7 +31,22 @@ FETCHERS = {
     "ashby": lambda s: fetch_ashby(s["company"], s.get("name")),
     "html": fetch_html,
     "equifax": lambda s: fetch_equifax(countries=s.get("countries", ["Costa Rica"])),
-    "pg": lambda s: fetch_pg(),
+    "pg": lambda s: fetch_pg(countries=s.get("countries", ["Costa Rica"])),
+    "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
+    # Cualquier otra bolsa Phenom: los valores salen de sources.yaml.
+    "phenom": lambda s: fetch_phenom(
+        site=s["site"],
+        page_id=s["page_id"],
+        page_name=s.get("page_name", "search"),
+        page_type=s.get("page_type", "search"),
+        id_prefix=s.get("id_prefix") or s["type"],
+        countries=s.get("countries", ["Costa Rica"]),
+        name=s.get("name"),
+        warmup_path=s.get("warmup_path", "/"),
+        ref_num=s.get("ref_num"),
+        all_fields=s.get("all_fields"),
+        extra=s.get("extra"),
+    ),
     "workday": lambda s: fetch_workday(
         tenant=s["tenant"],
         site=str(s["site"]),

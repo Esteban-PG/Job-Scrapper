@@ -8,9 +8,10 @@ La idea es reemplazar 15 alertas por correo ruidosas — cada una con su formato
 su frecuencia y su propio ruido — por **un solo feed filtrado**.
 
 ```
-23:15:48  INFO  equifax             12 vacantes ·   3 nuevas ·   2 notificadas
+23:15:48  INFO  equifax             11 vacantes ·   3 nuevas ·   2 notificadas
 23:15:51  INFO  pg                   2 vacantes ·   0 nuevas ·   0 notificadas
-23:15:51  INFO  total: 14 vacantes · 3 nuevas · 2 notificadas · 2/2 fuentes ok
+23:15:53  INFO  cisco                4 vacantes ·   1 nueva  ·   1 notificada
+23:15:53  INFO  total: 17 vacantes · 4 nuevas · 3 notificadas · 3/3 fuentes ok
 ```
 
 ```
@@ -33,7 +34,7 @@ número 16 pasa a ser una entrada en un YAML.
 | Lever | `jobs.lever.co/<empresa>` | API JSON pública | plantilla lista |
 | Ashby | `jobs.ashbyhq.com/<empresa>` | API JSON pública | plantilla lista |
 | Workday | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/` | ✅ verificada en vivo |
-| Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G) |
+| Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco) |
 | Equifax | feed XML propio | 1 GET al feed | ✅ verificada en vivo |
 | JS pesado sin API | nada en la pestaña Network | Playwright | último recurso, sin casos aún |
 
@@ -150,7 +151,15 @@ sources:
 
   - type: equifax
     countries: ["Costa Rica"]
+
+  - type: cisco                    # preset Phenom, igual que `pg`
+    countries: ["Costa Rica"]
 ```
+
+Las bolsas Phenom que ya tienen preset (`pg`, `cisco`) son una línea. Para una
+Phenom nueva va `type: phenom` con los valores que se ven en el POST a
+`/widgets` (`site`, `page_id`, `ref_num`, `id_prefix`); el ejemplo completo está
+comentado en `config/sources.yaml`.
 
 En Workday, `countries` va con el **nombre** del país tal como lo muestra el
 filtro del sitio. Internamente Workday no filtra por nombre sino por un ID opaco
@@ -257,19 +266,33 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
 - **P&G / Phenom**: el `x-csrf-token` no viene en un `<meta>` ni en un header,
   sino **adentro** del cookie `PLAY_SESSION`, que es un JWT — hay que decodificar
   el payload y sacar `data.csrfToken`. Si el POST vuelve vacío o con 403, ese es
-  el primer sospechoso.
+  el primer sospechoso. En Cisco el mismo token aparece **también plano en el
+  HTML**; el fetcher prueba el JWT primero y cae al HTML si no está.
+- **Phenom es la misma API para todos**: P&G y Cisco comparten endpoint, flujo de
+  token y forma de respuesta; lo que cambia son cuatro campos del payload
+  (`pageId`, `pageName`, `pageType`, `refNum`) y algunas rarezas por sitio (P&G
+  manda un bloque `locationData` de slider que Cisco no tiene). Por eso el
+  fetcher está parametrizado y las dos empresas son presets de la misma función.
+- **Cisco**: `pageName`/`pageType` describen desde qué página busca la UI y
+  **no cambian los resultados** (verificado: buscar desde la categoría "Product
+  and Engineering" o desde el buscador global devuelve lo mismo); el filtro real
+  es `selected_fields`. `size` acepta 100 sin quejarse, al revés que Workday. El
+  `x-csrf-token` resultó **opcional**: el endpoint responde 200 sin él, pero se
+  manda igual para replicar al navegador.
 - **P&G aparece en dos plataformas**: la bolsa es Phenom pero el botón "Aplicar"
   redirige a Workday (`pg.wd5.myworkdayjobs.com`). Ambos fetchers devuelven las
   mismas 2 vacantes de Costa Rica con IDs distintos (`pg-R000151170` vs
   `wd-pg-R000151170`), así que hay que activar **una sola**: el dedupe no puede
-  cruzarlas.
+  cruzarlas. Cisco es el mismo caso (`cisco.wd5.myworkdayjobs.com/Cisco_Careers`):
+  si algún día se agrega como `type: workday`, hay que sacar el `type: cisco`.
 
 ### Estado de verificación
 
 | Fuente | Verificado en vivo |
 |---|---|
-| Equifax (feed XML) | ✅ 12 vacantes en Costa Rica |
+| Equifax (feed XML) | ✅ 11 vacantes en Costa Rica |
 | P&G (Phenom) | ✅ 2 vacantes en Costa Rica |
+| Cisco (Phenom) | ✅ 4 vacantes en Costa Rica (de 1023 globales) |
 | Workday (tenant `pg`) | ✅ 2 vacantes, mismas que Phenom |
 | Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía |
 
@@ -297,7 +320,7 @@ jobbot/
     __init__.py           registro: type -> función
     ats.py                Greenhouse, Lever y Ashby (API JSON pública)
     equifax.py            feed XML
-    phenom.py             Phenom (POST + CSRF adentro de un JWT)
+    phenom.py             Phenom (POST + CSRF adentro de un JWT) + presets P&G/Cisco
     workday.py            Workday (POST CXS + facets)
     generic_html.py       último recurso: selector CSS
 .github/workflows/job-alerts.yml

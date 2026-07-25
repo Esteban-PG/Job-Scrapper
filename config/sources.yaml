@@ -57,8 +57,28 @@ sources:
 
   # P&G — plataforma Phenom (POST a /widgets con x-csrf-token).
   - type: pg
+    countries: ["Costa Rica"]
+
+  # Cisco — también Phenom, mismo endpoint /widgets, otro dominio.
+  - type: cisco
+    countries: ["Costa Rica"]
 
   # ---- Ejemplos: descomentá y ajustá ---------------------------------------
+
+  # Otra bolsa Phenom cualquiera (una que no tenga preset en phenom.py). Los
+  # valores salen del POST a /widgets en DevTools → Network:
+  #   site       el dominio de la bolsa
+  #   page_id    campo `pageId` del payload
+  #   ref_num    campo `refNum`, si el sitio lo manda
+  #   id_prefix  prefijo del id de dedupe; que sea único entre fuentes
+  # - type: phenom
+  #   name: "Empresa W"
+  #   site: "https://careers.empresaw.com"
+  #   warmup_path: "/en/jobs"
+  #   page_id: "page123-prod"
+  #   ref_num: "XXXGLOBAL"
+  #   id_prefix: "empresaw"
+  #   countries: ["Costa Rica"]
 
   # Workday. tenant/dc/site salen de la URL de la bolsa:
   #   https://pg.wd5.myworkdayjobs.com/1000  ->  tenant: pg, dc: wd5, site: "1000"

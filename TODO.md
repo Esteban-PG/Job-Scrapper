@@ -8,16 +8,18 @@ y cubriendo las 15 bolsas.
 Funcionando y verificado en vivo:
 
 - El paquete `jobbot/` corre: orquestador + 3 fetchers verificados (Equifax,
-  P&G/Phenom, Workday), con el proyecto ya organizado en carpetas.
+  Phenom, Workday), con el proyecto ya organizado en carpetas.
+- El fetcher de Phenom quedó **parametrizado** (ver 3.2, ya hecho): P&G y Cisco
+  son presets de la misma función.
 - Fuentes y filtros externalizados en `config/sources.yaml`.
 - Dedupe en SQLite, logging por fuente, `--dry-run`, `--source`, `--config`.
 - Telegram **probado end-to-end**: el bot **@FlippyJobBot** entregó un mensaje real.
 - Workflow de GitHub Actions escrito (`*/30`), con persistencia de la base.
 
-Hoy el bot revisa **2 fuentes** (Equifax + P&G) y encuentra 14 vacantes, 8 de las
-cuales pasan el filtro.
+Hoy el bot revisa **3 fuentes** (Equifax + P&G + Cisco) y encuentra 17 vacantes,
+11 de las cuales pasan el filtro.
 
-Falta: subirlo, activarlo, y cargarle las otras 13 bolsas.
+Falta: subirlo, activarlo, y cargarle las otras 12 bolsas.
 
 ---
 
@@ -25,11 +27,12 @@ Falta: subirlo, activarlo, y cargarle las otras 13 bolsas.
 
 ### 1.1 Sembrar la base — decisión previa
 
-`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 14 vacantes
+`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 17 vacantes
 actuales **en silencio** (por diseño, para no recibir una avalancha). Efecto
-secundario: las **8 vacantes que hoy pasan el filtro nunca te van a llegar**.
+secundario: las **11 vacantes que hoy pasan el filtro nunca te van a llegar**
+(entre ellas las 4 de Cisco).
 
-- [ ] **Decidir**: ¿querés recibir esas 8 una vez antes de sembrar, o arrancar
+- [ ] **Decidir**: ¿querés recibir esas 11 una vez antes de sembrar, o arrancar
       limpio y ver solo lo que aparezca de ahora en adelante?
   - Arrancar limpio → `python run.py` (siembra y calla).
   - Verlas primero → pedirlo antes de la primera corrida; después ya no se puede
@@ -75,12 +78,12 @@ gh repo create job-alert-bot --public --source=. --push
 
 ---
 
-## 2. Cargar las 13 bolsas que faltan
+## 2. Cargar las 12 bolsas que faltan
 
-El bot corre con 2 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
+El bot corre con 3 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
 recompensa que queda.
 
-- [ ] Juntar las URLs de las 13 bolsas restantes.
+- [ ] Juntar las URLs de las 12 bolsas restantes.
 - [ ] Clasificar cada una mirando la URL, y agregarla a `config/sources.yaml`:
 
 | Si la URL tiene… | `type:` | Params |
@@ -89,7 +92,8 @@ recompensa que queda.
 | `jobs.lever.co/<empresa>` | `lever` | `company` |
 | `jobs.ashbyhq.com/<empresa>` | `ashby` | `company` |
 | `<tenant>.<dc>.myworkdayjobs.com/<site>` | `workday` | `tenant`, `dc`, `site`, `countries` |
-| endpoint `/widgets` (Phenom) | `pg` | (hoy fijo a P&G, ver 3.2) |
+| endpoint `/widgets` (Phenom) | `phenom` | `site`, `page_id`, `ref_num`, `id_prefix`, `countries` |
+| …y si es P&G o Cisco | `pg` / `cisco` | `countries` (preset, todo lo demás ya está) |
 | ninguna de las anteriores | `html` | `url`, `item_selector`, `base_url` |
 
 - [ ] Probar cada fuente nueva sola antes de dejarla fija:
@@ -113,11 +117,12 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
       `config/sources.yaml`, no hace falta tocar Python. Mirá sobre todo los falsos
       negativos: si aparece una vacante que te servía y el bot no avisó, casi
       siempre es que el título no matcheaba ningún `include`.
-- [ ] **3.2 — Generalizar el fetcher de Phenom.** Hoy `jobbot/fetchers/phenom.py`
-      está fijo a P&G (`SITE`, `PAGE_ID`, `RK` hardcodeados) y por eso su función
-      todavía se llama `fetch_pg`. Si alguna de las 13 bolsas resulta ser Phenom,
-      conviene parametrizarlo igual que `workday.py` y pasar esos valores desde
-      `config/sources.yaml`.
+- [x] **3.2 — Generalizar el fetcher de Phenom.** Hecho al agregar Cisco:
+      `jobbot/fetchers/phenom.py` expone `fetch_phenom(site, page_id, …)`
+      parametrizado igual que `workday.py`, y `fetch_pg`/`fetch_cisco` son
+      presets con los valores ya puestos. Una bolsa Phenom nueva se agrega con
+      `type: phenom` desde `config/sources.yaml`, sin tocar Python; si se repite
+      mucho, conviene darle su preset.
 - [ ] **3.3 — Playwright**, solo si alguna bolsa resulta ser JS-pesada-sin-API.
       No hay ningún caso todavía; no adelantarse.
 - [ ] **3.4 — Limpiar la base cada tanto** (opcional). `data/seen_jobs.db` solo crece.
@@ -128,14 +133,16 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
 
 ## Decisiones abiertas
 
-1. **¿Ver las 8 vacantes actuales antes de sembrar?** (ver 1.1)
+1. **¿Ver las 11 vacantes actuales antes de sembrar?** (ver 1.1)
 2. **¿Repo público o privado?** (ver 1.2 — afecta el costo de Actions)
 3. **P&G: Phenom o Workday.** Hoy está activo `type: pg` (Phenom) y la entrada de
    Workday quedó comentada en `config/sources.yaml`. Son **la misma bolsa**: el botón
    "Aplicar" de Phenom redirige a `pg.wd5.myworkdayjobs.com`. Devuelven las mismas
    2 vacantes con IDs distintos (`pg-R000151170` vs `wd-pg-R000151170`), así que
    si activás las dos vas a recibir todo duplicado — el dedupe no las puede
-   cruzar. Dejar una sola.
+   cruzar. Dejar una sola. **Cisco es el mismo caso** (`cisco.wd5` /
+   `Cisco_Careers`): hoy está activo `type: cisco` (Phenom) y no hay entrada de
+   Workday; si algún día se agrega, sacar una de las dos.
 
 ---
 
@@ -152,7 +159,12 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
   y nada más. Verificado en 3 tenants (`pg`, `intel`, `3m`).
 - **Phenom**: el `x-csrf-token` va **adentro** del cookie `PLAY_SESSION`, que es
   un JWT (campo `data.csrfToken`). Si el POST devuelve vacío o 403, ese es el
-  primer sospechoso.
+  primer sospechoso. En Cisco además aparece plano en el HTML, y el endpoint
+  responde 200 aunque no se mande — pero se manda igual.
+- **Phenom, campos del payload**: `pageId`/`pageName`/`pageType` describen desde
+  qué página busca la UI y **no cambian los resultados**; el filtro real es
+  `selected_fields`. Se pagina con `from`/`size` y Cisco acepta `size: 100`
+  (Workday, en cambio, topa en 20).
 - **Telegram**: los mensajes van en **HTML, no Markdown**. Títulos reales como
   `FP&A Analyst` o `Support (French, English)` rompen el parser Markdown y el
   envío falla con HTTP 400.
