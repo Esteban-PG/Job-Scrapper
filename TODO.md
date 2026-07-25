@@ -7,8 +7,8 @@ y cubriendo las 15 bolsas.
 
 Funcionando y verificado en vivo:
 
-- El paquete `jobbot/` corre: orquestador + 3 fetchers verificados (Equifax,
-  Phenom, Workday), con el proyecto ya organizado en carpetas.
+- El paquete `jobbot/` corre: orquestador + 4 fetchers verificados (Equifax,
+  Phenom, Workday, Amazon), con el proyecto ya organizado en carpetas.
 - El fetcher de Phenom quedó **parametrizado** (ver 3.2, ya hecho): P&G, Cisco y
   HPE son presets de la misma función.
 - Fuentes y filtros externalizados en `config/sources.yaml`.
@@ -16,10 +16,10 @@ Funcionando y verificado en vivo:
 - Telegram **probado end-to-end**: el bot **@FlippyJobBot** entregó un mensaje real.
 - Workflow de GitHub Actions escrito (`*/30`), con persistencia de la base.
 
-Hoy el bot revisa **4 fuentes** (Equifax + P&G + Cisco + HPE) y encuentra 37
-vacantes, 18 de las cuales pasan el filtro.
+Hoy el bot revisa **5 fuentes** (Equifax + P&G + Cisco + HPE + Amazon) y
+encuentra 45 vacantes, 24 de las cuales pasan el filtro.
 
-Falta: subirlo, activarlo, y cargarle las otras 11 bolsas.
+Falta: subirlo, activarlo, y cargarle las otras 10 bolsas.
 
 ---
 
@@ -27,12 +27,12 @@ Falta: subirlo, activarlo, y cargarle las otras 11 bolsas.
 
 ### 1.1 Sembrar la base — decisión previa
 
-`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 37 vacantes
+`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 45 vacantes
 actuales **en silencio** (por diseño, para no recibir una avalancha). Efecto
-secundario: las **18 vacantes que hoy pasan el filtro nunca te van a llegar**
-(entre ellas las 4 de Cisco y 7 de HPE).
+secundario: las **24 vacantes que hoy pasan el filtro nunca te van a llegar**
+(7 de Equifax, 4 de Cisco, 7 de HPE y 6 de Amazon).
 
-- [ ] **Decidir**: ¿querés recibir esas 18 una vez antes de sembrar, o arrancar
+- [ ] **Decidir**: ¿querés recibir esas 24 una vez antes de sembrar, o arrancar
       limpio y ver solo lo que aparezca de ahora en adelante?
   - Arrancar limpio → `python run.py` (siembra y calla).
   - Verlas primero → pedirlo antes de la primera corrida; después ya no se puede
@@ -78,12 +78,12 @@ gh repo create job-alert-bot --public --source=. --push
 
 ---
 
-## 2. Cargar las 11 bolsas que faltan
+## 2. Cargar las 10 bolsas que faltan
 
-El bot corre con 4 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
+El bot corre con 5 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
 recompensa que queda.
 
-- [ ] Juntar las URLs de las 11 bolsas restantes.
+- [ ] Juntar las URLs de las 10 bolsas restantes.
 - [ ] Clasificar cada una mirando la URL, y agregarla a `config/sources.yaml`:
 
 | Si la URL tiene… | `type:` | Params |
@@ -94,6 +94,7 @@ recompensa que queda.
 | `<tenant>.<dc>.myworkdayjobs.com/<site>` | `workday` | `tenant`, `dc`, `site`, `countries` |
 | endpoint `/widgets` (Phenom) | `phenom` | `site`, `page_id`, `ref_num`, `id_prefix`, `countries` |
 | …y si es P&G, Cisco o HPE | `pg` / `cisco` / `hpe` | `countries` (preset, todo lo demás ya está) |
+| `amazon.jobs` | `amazon` | `countries` (nombre o ISO-2), `categories` |
 | ninguna de las anteriores | `html` | `url`, `item_selector`, `base_url` |
 
 - [ ] Probar cada fuente nueva sola antes de dejarla fija:
@@ -173,6 +174,18 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
   la principal y `multi_location` lista las ciudades **sin país**, así que el
   fetcher les anota "(+N ubicaciones, incluye Costa Rica)". Si se saca esa
   anotación, el `location_hints` del bot las descarta en silencio.
+- **Amazon**: POST a `amazon.jobs/api/jobs/search?is_als=true`, **sin token ni
+  cookies** (el `x-api-key` del navegador es opcional). Filtra por **ISO-2**
+  (`CR`), no por nombre — el fetcher traduce. En `searchHits[].fields` cada
+  valor viene **envuelto en una lista de un elemento**. El `urlNextStep` que
+  trae cada vacante **no sirve de enlace**: redirige al login; usar
+  `www.amazon.jobs/en/jobs/<icimsJobId>`.
+- **Amazon, categorías**: es la única fuente que filtra por categoría en el
+  origen (73 vacantes en Costa Rica, 65 fuera de ingeniería). **"Software
+  Development" sola trae 1** — casi toda la ingeniería está en "Operations, IT,
+  & Support Engineering", y los roles de datos en "Business Intelligence". Un
+  nombre mal escrito devuelve cero **sin dar error**; sacalos de
+  `python -m jobbot.fetchers.amazon --categorias`, que los lista con su conteo.
 - **Telegram**: los mensajes van en **HTML, no Markdown**. Títulos reales como
   `FP&A Analyst` o `Support (French, English)` rompen el parser Markdown y el
   envío falla con HTTP 400.

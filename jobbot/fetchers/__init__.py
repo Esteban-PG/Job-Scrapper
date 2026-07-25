@@ -19,6 +19,7 @@ Para agregar una plataforma nueva: un módulo acá con su `fetch_<algo>()`, y un
 entrada en FETCHERS. Nada más se toca.
 """
 
+from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
@@ -31,6 +32,13 @@ FETCHERS = {
     "ashby": lambda s: fetch_ashby(s["company"], s.get("name")),
     "html": fetch_html,
     "equifax": lambda s: fetch_equifax(countries=s.get("countries", ["Costa Rica"])),
+    "amazon": lambda s: fetch_amazon(
+        countries=s.get("countries", ["Costa Rica"]),
+        query=s.get("query", ""),
+        # `categories` ausente = las técnicas por defecto; `categories: []` =
+        # todas (son dos cosas distintas, por eso no se usa s.get(k, default)).
+        categories=(s["categories"] if "categories" in s else CATEGORIES_TECH),
+    ),
     "pg": lambda s: fetch_pg(countries=s.get("countries", ["Costa Rica"])),
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),

@@ -67,6 +67,24 @@ sources:
   - type: hpe
     countries: ["Costa Rica"]
 
+  # Amazon — ATS propio (amazon.jobs), 1 POST sin token ni cookies.
+  # `countries` acepta el nombre o el código ISO-2 ("CR").
+  #
+  # Es la ÚNICA fuente que además filtra por categoría en el origen: Amazon
+  # publica mucho que no es de ingeniería (ventas, diseño, soporte
+  # administrativo: 65 de las 73 de Costa Rica). Si se omite `categories`, se
+  # usan las técnicas por defecto (CATEGORIES_TECH en jobbot/fetchers/amazon.py).
+  # `categories: []` trae TODAS y deja que filtre el bot por título.
+  # Los nombres tienen que ser exactos; para verlos:
+  #     python -m jobbot.fetchers.amazon --categorias
+  - type: amazon
+    countries: ["Costa Rica"]
+    categories:
+      - "Software Development"
+      - "Operations, IT, & Support Engineering"
+      - "Business Intelligence"
+      - "Solutions Architect"
+
   # ---- Ejemplos: descomentá y ajustá ---------------------------------------
 
   # Otra bolsa Phenom cualquiera (una que no tenga preset en phenom.py). Los

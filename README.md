@@ -12,7 +12,8 @@ su frecuencia y su propio ruido — por **un solo feed filtrado**.
 23:15:51  INFO  pg                   2 vacantes ·   0 nuevas ·   0 notificadas
 23:15:53  INFO  cisco                4 vacantes ·   1 nueva  ·   1 notificada
 23:15:56  INFO  hpe                 20 vacantes ·   2 nuevas ·   1 notificada
-23:15:56  INFO  total: 37 vacantes · 6 nuevas · 4 notificadas · 4/4 fuentes ok
+23:15:58  INFO  amazon              73 vacantes ·   5 nuevas ·   2 notificadas
+23:15:58  INFO  total: 110 vacantes · 11 nuevas · 6 notificadas · 5/5 fuentes ok
 ```
 
 ```
@@ -37,6 +38,7 @@ número 16 pasa a ser una entrada en un YAML.
 | Workday | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/` | ✅ verificada en vivo |
 | Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco, HPE) |
 | Equifax | feed XML propio | 1 GET al feed | ✅ verificada en vivo |
+| Amazon | `amazon.jobs/api/jobs/search` | 1 POST, sin token | ✅ verificada en vivo |
 | JS pesado sin API | nada en la pestaña Network | Playwright | último recurso, sin casos aún |
 
 **LinkedIn e Indeed quedan fuera a propósito.** Bloquean el scraping de forma
@@ -110,8 +112,9 @@ sigue viva:
 
 ```bash
 python jobbot/fetchers/equifax.py
-python jobbot/fetchers/phenom.py
+python jobbot/fetchers/phenom.py    # P&G, Cisco y HPE
 python jobbot/fetchers/workday.py
+python jobbot/fetchers/amazon.py
 ```
 
 ### Configurar Telegram
@@ -155,6 +158,12 @@ sources:
 
   - type: cisco                    # preset Phenom, igual que `pg` y `hpe`
     countries: ["Costa Rica"]
+
+  - type: amazon                   # amazon.jobs; acepta nombre o ISO-2 ("CR")
+    countries: ["Costa Rica"]
+    categories:                    # opcional; omitir = las técnicas por defecto
+      - "Software Development"     # `categories: []` = todas
+      - "Operations, IT, & Support Engineering"
 ```
 
 Las bolsas Phenom que ya tienen preset (`pg`, `cisco`, `hpe`) son una línea. Para una
@@ -235,6 +244,13 @@ Acá `data/seen_jobs.db` persiste solo, que es la ventaja principal.
   el origen (`subsearch` vacío en Phenom, `searchText` vacío en Workday). Cada
   sitio indexa distinto y una búsqueda por "junior" se come vacantes que sí
   servían. Se trae todo lo de la ubicación y filtra el bot.
+- **Amazon es la excepción, y filtra por categoría en el origen.** Publica tanto
+  fuera de ingeniería que traer todo son 73 vacantes de Costa Rica para quedarse
+  con 8. La diferencia con filtrar por palabra clave es que la **categoría es un
+  campo estructurado del propio ATS**, no una búsqueda de texto: no se come
+  títulos por cómo estén redactados. Aun así conviene ser generoso con la lista
+  — "Software Development" sola trae 1 vacante, porque Amazon clasifica casi
+  toda la ingeniería bajo "Operations, IT, & Support Engineering".
 - **Una fuente caída no tumba la corrida.** Cada fuente va en su try/except; se
   loguea el error y sigue con las demás. El proceso solo sale con error si
   fallaron *todas*.
@@ -277,6 +293,25 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
   alguna rareza suelta (P&G manda un bloque `locationData` de slider que los
   otros no tienen). Por eso el fetcher está parametrizado y cada empresa es un
   preset de la misma función.
+- **Amazon** no usa un ATS de terceros, tiene el suyo (`sourceSystem:
+  JobCreator`), pero la API es la más simple de todas: un POST sin token ni
+  cookies y `size: 100` trae las 73 de Costa Rica de una. Dos trampas: en
+  `searchHits[].fields` **cada valor viene envuelto en una lista de un
+  elemento** (`"title": ["Designer, …"]`), y el campo `urlNextStep` **no sirve
+  de enlace** — apunta a `account.amazon.jobs/…/apply`, que redirige a la
+  pantalla de login. La página pública es `www.amazon.jobs/en/jobs/<icimsJobId>`.
+- **Las categorías de Amazon engañan.** "Software Development" tiene **1**
+  vacante en Costa Rica; los *Incident Management Engineer* y el *AV Deployment
+  Engineer* viven en "Operations, IT, & Support Engineering", y los de datos en
+  "Business Intelligence". Un nombre mal escrito no da error: devuelve cero en
+  silencio. Para ver los nombres exactos con su conteo:
+  `python -m jobbot.fetchers.amazon --categorias`.
+- **Amazon filtra por código ISO-2** (`CR`), no por nombre. El fetcher traduce
+  `countries: ["Costa Rica"]` para no romper el contrato del resto de las
+  fuentes, y si el país no está en su tabla lo dice con un error claro en vez de
+  traer el mundo entero. Además `normalizedLocation` termina en el ISO-3
+  (`"Heredia, Heredia, CRI"`), así que la ubicación se rearma con el nombre del
+  país para que `location_hints` tenga contra qué matchear.
 - **Vacantes multi-ubicación (HPE)**: 8 de las 20 de Costa Rica tienen la sede
   principal en Texas, India o México y Heredia como sede adicional. El filtro de
   país de la API **sí** las devuelve bien, pero `cityStateCountry` muestra solo
@@ -307,6 +342,7 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
 | P&G (Phenom) | ✅ 2 vacantes en Costa Rica |
 | Cisco (Phenom) | ✅ 4 vacantes en Costa Rica (de 1023 globales) |
 | HPE (Phenom) | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede |
+| Amazon (ATS propio) | ✅ 8 vacantes técnicas en Costa Rica (73 sin filtrar por categoría) |
 | Workday (tenant `pg`) | ✅ 2 vacantes, mismas que Phenom |
 | Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía |
 
@@ -333,6 +369,7 @@ jobbot/
   fetchers/
     __init__.py           registro: type -> función
     ats.py                Greenhouse, Lever y Ashby (API JSON pública)
+    amazon.py             amazon.jobs (POST sin token)
     equifax.py            feed XML
     phenom.py             Phenom (POST + CSRF en un JWT) + presets P&G/Cisco/HPE
     workday.py            Workday (POST CXS + facets)
