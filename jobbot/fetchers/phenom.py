@@ -24,8 +24,13 @@ De dónde salen los parámetros (DevTools → pestaña Network → POST a /widge
     page_name   campo `pageName`                  search
     page_type   campo `pageType`                  search
     ref_num     campo `refNum` (no todos lo usan) CISCISGLOBAL
+    lang        campo `lang`                      en_global (HPE usa en_us)
+    locale      campo `country` del payload       global    (HPE usa us)
     extra       cualquier campo extra del payload que ese sitio mande
                 (P&G manda `rk`/`locationData`, Cisco no)
+
+`locale` es el idioma/mercado del SITIO, no el filtro de país: el país de la
+vacante va siempre en `selected_fields.country`.
 
 `page_name`/`page_type` describen la página desde la que la UI dispara la
 búsqueda; verificado en vivo que NO cambian los resultados (buscar desde la
@@ -102,7 +107,7 @@ def _open_session(warmup_url, label):
 def _build_payload(cfg, ddo_key, from_offset):
     """Payload base común a todo Phenom + los campos propios del sitio."""
     base = {
-        "lang": "en_global", "deviceType": "desktop", "country": "global",
+        "lang": cfg["lang"], "deviceType": "desktop", "country": cfg["locale"],
         "sortBy": "", "subsearch": "", "keywords": "",
         "jobs": True, "counts": True, "global": True,
         "all_fields": cfg["all_fields"],
@@ -152,15 +157,29 @@ def _extract(resp_json):
     return jobs, len(jobs)
 
 
-def _location(j):
-    """La ubicación viene con distinto nombre según el sitio."""
-    for key in ("cityStateCountry", "location"):
-        if j.get(key):
-            return j[key]
+def _location(j, countries):
+    """La ubicación viene con distinto nombre según el sitio.
+
+    Ojo con las vacantes **multi-ubicación**: los campos de arriba muestran solo
+    la sede principal, que puede estar en otro país. HPE publica puestos con
+    sede en Texas o India que TAMBIÉN se pueden tomar desde Heredia (8 de las 20
+    de Costa Rica son así), y `multi_location` lista las ciudades sin el país
+    ("Heredia, Heredia, 400803"), así que no hay de dónde sacar el nombre.
+
+    Como el filtro de país lo aplicó la API, sabemos que el país pedido está
+    entre las ubicaciones aunque no figure en el texto: se anota. Sin esto el
+    filtro de ubicación del bot descartaría vacantes que sí sirven."""
+    primary = j.get("cityStateCountry") or j.get("location") or ""
     multi = j.get("multi_location") or []
-    if multi:
-        return multi[0]
-    return ", ".join(p for p in (j.get("city"), j.get("country")) if p)
+    if not primary:
+        primary = multi[0] if multi else ", ".join(
+            p for p in (j.get("city"), j.get("country")) if p)
+
+    others = len(multi) - 1
+    if countries and others > 0 and (j.get("country") or "") not in countries:
+        plural = "ubicación" if others == 1 else "ubicaciones"
+        return f"{primary} (+{others} {plural}, incluye {' o '.join(countries)})"
+    return primary
 
 
 def _category(j):
@@ -170,11 +189,11 @@ def _category(j):
     return multi[0] if multi else ""
 
 
-def _map_job(j, id_prefix, label):
+def _map_job(j, id_prefix, label, countries=()):
     return {
         "id": f"{id_prefix}-{j.get('jobId') or j.get('reqId') or j.get('id')}",
         "title": j.get("title", ""),
-        "location": _location(j),
+        "location": _location(j, countries),
         "category": _category(j),
         "posted": (j.get("postedDate") or "")[:10],   # 2026-07-21T00:00… -> 2026-07-21
         "url": j.get("applyUrl") or j.get("jobUrl") or "",
@@ -185,7 +204,7 @@ def _map_job(j, id_prefix, label):
 def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
                  countries=("Costa Rica",), name=None, warmup_path="/",
                  ref_num=None, all_fields=None, page_size=PAGE_SIZE,
-                 extra=None):
+                 lang="en_global", locale="global", extra=None):
     """
     Devuelve las vacantes de una bolsa Phenom, ya normalizadas.
 
@@ -199,6 +218,7 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
     warmup_path  página que se visita para obtener el cookie/token
     ref_num      `refNum` del payload, si el sitio lo manda
     all_fields   facets que se piden de vuelta; casi nunca hace falta tocarlo
+    lang/locale  idioma y mercado del SITIO (no el filtro de país)
     extra        campos extra del payload propios del sitio
     """
     label = name or id_prefix
@@ -206,6 +226,7 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
         "page_id": page_id, "page_name": page_name, "page_type": page_type,
         "countries": list(countries) if countries else [],
         "ref_num": ref_num, "page_size": page_size,
+        "lang": lang, "locale": locale,
         "all_fields": all_fields or DEFAULT_ALL_FIELDS,
         "extra": extra or {},
     }
@@ -247,7 +268,7 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
             break
 
         for j in jobs:
-            m = _map_job(j, id_prefix, label)
+            m = _map_job(j, id_prefix, label, cfg["countries"])
             by_id[m["id"]] = m
 
         from_offset += cfg["page_size"]
@@ -300,11 +321,34 @@ def fetch_cisco(countries=("Costa Rica",), name="Cisco"):
     )
 
 
+def fetch_hpe(countries=("Costa Rica",), name="HPE"):
+    """HPE — https://careers.hpe.com (verificado: 20 vacantes en Costa Rica).
+
+    Único preset que no corre en `en_global`/`global`: el sitio de HPE es el
+    mercado US (`en_us`/`us`). Eso NO limita las vacantes a Estados Unidos —
+    el país lo sigue filtrando `selected_fields.country`.
+
+    "Aplicar" redirige a Workday (hpe.wd5.myworkdayjobs.com/Jobsathpe), igual
+    que P&G y Cisco: activar esta o la de Workday, no las dos.
+    """
+    return fetch_phenom(
+        site="https://careers.hpe.com",
+        warmup_path="/us/en/search-results",
+        page_id="page15", page_name="search-results1", page_type="search",
+        id_prefix="hpe", ref_num="HPE1US",
+        lang="en_us", locale="us",
+        countries=countries, name=name,
+        page_size=100,      # verificado: HPE acepta size=100
+        all_fields=["category", "country", "state", "city", "type",
+                    "postalCode", "remote"],
+    )
+
+
 # --------------------------------------------------------------------------
 # Prueba directa
 # --------------------------------------------------------------------------
 if __name__ == "__main__":
-    for fetch in (fetch_pg, fetch_cisco):
+    for fetch in (fetch_pg, fetch_cisco, fetch_hpe):
         jobs = fetch()
         source = jobs[0]["source"] if jobs else fetch.__name__
         print(f"\n{len(jobs)} vacantes de {source} en Costa Rica:\n")

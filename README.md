@@ -11,7 +11,8 @@ su frecuencia y su propio ruido — por **un solo feed filtrado**.
 23:15:48  INFO  equifax             11 vacantes ·   3 nuevas ·   2 notificadas
 23:15:51  INFO  pg                   2 vacantes ·   0 nuevas ·   0 notificadas
 23:15:53  INFO  cisco                4 vacantes ·   1 nueva  ·   1 notificada
-23:15:53  INFO  total: 17 vacantes · 4 nuevas · 3 notificadas · 3/3 fuentes ok
+23:15:56  INFO  hpe                 20 vacantes ·   2 nuevas ·   1 notificada
+23:15:56  INFO  total: 37 vacantes · 6 nuevas · 4 notificadas · 4/4 fuentes ok
 ```
 
 ```
@@ -34,7 +35,7 @@ número 16 pasa a ser una entrada en un YAML.
 | Lever | `jobs.lever.co/<empresa>` | API JSON pública | plantilla lista |
 | Ashby | `jobs.ashbyhq.com/<empresa>` | API JSON pública | plantilla lista |
 | Workday | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/` | ✅ verificada en vivo |
-| Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco) |
+| Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco, HPE) |
 | Equifax | feed XML propio | 1 GET al feed | ✅ verificada en vivo |
 | JS pesado sin API | nada en la pestaña Network | Playwright | último recurso, sin casos aún |
 
@@ -152,11 +153,11 @@ sources:
   - type: equifax
     countries: ["Costa Rica"]
 
-  - type: cisco                    # preset Phenom, igual que `pg`
+  - type: cisco                    # preset Phenom, igual que `pg` y `hpe`
     countries: ["Costa Rica"]
 ```
 
-Las bolsas Phenom que ya tienen preset (`pg`, `cisco`) son una línea. Para una
+Las bolsas Phenom que ya tienen preset (`pg`, `cisco`, `hpe`) son una línea. Para una
 Phenom nueva va `type: phenom` con los valores que se ven en el POST a
 `/widgets` (`site`, `page_id`, `ref_num`, `id_prefix`); el ejemplo completo está
 comentado en `config/sources.yaml`.
@@ -268,11 +269,22 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
   el payload y sacar `data.csrfToken`. Si el POST vuelve vacío o con 403, ese es
   el primer sospechoso. En Cisco el mismo token aparece **también plano en el
   HTML**; el fetcher prueba el JWT primero y cae al HTML si no está.
-- **Phenom es la misma API para todos**: P&G y Cisco comparten endpoint, flujo de
-  token y forma de respuesta; lo que cambia son cuatro campos del payload
-  (`pageId`, `pageName`, `pageType`, `refNum`) y algunas rarezas por sitio (P&G
-  manda un bloque `locationData` de slider que Cisco no tiene). Por eso el
-  fetcher está parametrizado y las dos empresas son presets de la misma función.
+- **Phenom es la misma API para todos**: P&G, Cisco y HPE comparten endpoint,
+  flujo de token y forma de respuesta; lo que cambia son cuatro campos del
+  payload (`pageId`, `pageName`, `pageType`, `refNum`), el idioma/mercado del
+  sitio (HPE corre en `en_us`/`us`, los otros en `en_global`/`global` — no
+  limita las vacantes a EE.UU., el país lo sigue filtrando `selected_fields`) y
+  alguna rareza suelta (P&G manda un bloque `locationData` de slider que los
+  otros no tienen). Por eso el fetcher está parametrizado y cada empresa es un
+  preset de la misma función.
+- **Vacantes multi-ubicación (HPE)**: 8 de las 20 de Costa Rica tienen la sede
+  principal en Texas, India o México y Heredia como sede adicional. El filtro de
+  país de la API **sí** las devuelve bien, pero `cityStateCountry` muestra solo
+  la principal, así que el `location_hints` del bot las descartaría. Peor: el
+  array `multi_location` lista las ciudades **sin el país**
+  (`"Heredia, Heredia, 400803"`), o sea que no hay de dónde leer "Costa Rica".
+  Como el filtro lo aplicó la API, el fetcher anota la ubicación como
+  `Spring, Texas, … (+2 ubicaciones, incluye Costa Rica)`.
 - **Cisco**: `pageName`/`pageType` describen desde qué página busca la UI y
   **no cambian los resultados** (verificado: buscar desde la categoría "Product
   and Engineering" o desde el buscador global devuelve lo mismo); el filtro real
@@ -283,8 +295,9 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
   redirige a Workday (`pg.wd5.myworkdayjobs.com`). Ambos fetchers devuelven las
   mismas 2 vacantes de Costa Rica con IDs distintos (`pg-R000151170` vs
   `wd-pg-R000151170`), así que hay que activar **una sola**: el dedupe no puede
-  cruzarlas. Cisco es el mismo caso (`cisco.wd5.myworkdayjobs.com/Cisco_Careers`):
-  si algún día se agrega como `type: workday`, hay que sacar el `type: cisco`.
+  cruzarlas. Cisco (`cisco.wd5/Cisco_Careers`) y HPE (`hpe.wd5/Jobsathpe`) son
+  el mismo caso: si algún día se agregan como `type: workday`, hay que sacar el
+  preset de Phenom correspondiente.
 
 ### Estado de verificación
 
@@ -293,6 +306,7 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
 | Equifax (feed XML) | ✅ 11 vacantes en Costa Rica |
 | P&G (Phenom) | ✅ 2 vacantes en Costa Rica |
 | Cisco (Phenom) | ✅ 4 vacantes en Costa Rica (de 1023 globales) |
+| HPE (Phenom) | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede |
 | Workday (tenant `pg`) | ✅ 2 vacantes, mismas que Phenom |
 | Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía |
 
@@ -320,7 +334,7 @@ jobbot/
     __init__.py           registro: type -> función
     ats.py                Greenhouse, Lever y Ashby (API JSON pública)
     equifax.py            feed XML
-    phenom.py             Phenom (POST + CSRF adentro de un JWT) + presets P&G/Cisco
+    phenom.py             Phenom (POST + CSRF en un JWT) + presets P&G/Cisco/HPE
     workday.py            Workday (POST CXS + facets)
     generic_html.py       último recurso: selector CSS
 .github/workflows/job-alerts.yml

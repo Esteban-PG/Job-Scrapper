@@ -9,17 +9,17 @@ Funcionando y verificado en vivo:
 
 - El paquete `jobbot/` corre: orquestador + 3 fetchers verificados (Equifax,
   Phenom, Workday), con el proyecto ya organizado en carpetas.
-- El fetcher de Phenom quedó **parametrizado** (ver 3.2, ya hecho): P&G y Cisco
-  son presets de la misma función.
+- El fetcher de Phenom quedó **parametrizado** (ver 3.2, ya hecho): P&G, Cisco y
+  HPE son presets de la misma función.
 - Fuentes y filtros externalizados en `config/sources.yaml`.
 - Dedupe en SQLite, logging por fuente, `--dry-run`, `--source`, `--config`.
 - Telegram **probado end-to-end**: el bot **@FlippyJobBot** entregó un mensaje real.
 - Workflow de GitHub Actions escrito (`*/30`), con persistencia de la base.
 
-Hoy el bot revisa **3 fuentes** (Equifax + P&G + Cisco) y encuentra 17 vacantes,
-11 de las cuales pasan el filtro.
+Hoy el bot revisa **4 fuentes** (Equifax + P&G + Cisco + HPE) y encuentra 37
+vacantes, 18 de las cuales pasan el filtro.
 
-Falta: subirlo, activarlo, y cargarle las otras 12 bolsas.
+Falta: subirlo, activarlo, y cargarle las otras 11 bolsas.
 
 ---
 
@@ -27,12 +27,12 @@ Falta: subirlo, activarlo, y cargarle las otras 12 bolsas.
 
 ### 1.1 Sembrar la base — decisión previa
 
-`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 17 vacantes
+`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 37 vacantes
 actuales **en silencio** (por diseño, para no recibir una avalancha). Efecto
-secundario: las **11 vacantes que hoy pasan el filtro nunca te van a llegar**
-(entre ellas las 4 de Cisco).
+secundario: las **18 vacantes que hoy pasan el filtro nunca te van a llegar**
+(entre ellas las 4 de Cisco y 7 de HPE).
 
-- [ ] **Decidir**: ¿querés recibir esas 11 una vez antes de sembrar, o arrancar
+- [ ] **Decidir**: ¿querés recibir esas 18 una vez antes de sembrar, o arrancar
       limpio y ver solo lo que aparezca de ahora en adelante?
   - Arrancar limpio → `python run.py` (siembra y calla).
   - Verlas primero → pedirlo antes de la primera corrida; después ya no se puede
@@ -78,12 +78,12 @@ gh repo create job-alert-bot --public --source=. --push
 
 ---
 
-## 2. Cargar las 12 bolsas que faltan
+## 2. Cargar las 11 bolsas que faltan
 
-El bot corre con 3 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
+El bot corre con 4 de las ~15 fuentes ya identificadas. Esta es la tarea de mayor
 recompensa que queda.
 
-- [ ] Juntar las URLs de las 12 bolsas restantes.
+- [ ] Juntar las URLs de las 11 bolsas restantes.
 - [ ] Clasificar cada una mirando la URL, y agregarla a `config/sources.yaml`:
 
 | Si la URL tiene… | `type:` | Params |
@@ -93,7 +93,7 @@ recompensa que queda.
 | `jobs.ashbyhq.com/<empresa>` | `ashby` | `company` |
 | `<tenant>.<dc>.myworkdayjobs.com/<site>` | `workday` | `tenant`, `dc`, `site`, `countries` |
 | endpoint `/widgets` (Phenom) | `phenom` | `site`, `page_id`, `ref_num`, `id_prefix`, `countries` |
-| …y si es P&G o Cisco | `pg` / `cisco` | `countries` (preset, todo lo demás ya está) |
+| …y si es P&G, Cisco o HPE | `pg` / `cisco` / `hpe` | `countries` (preset, todo lo demás ya está) |
 | ninguna de las anteriores | `html` | `url`, `item_selector`, `base_url` |
 
 - [ ] Probar cada fuente nueva sola antes de dejarla fija:
@@ -133,15 +133,15 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
 
 ## Decisiones abiertas
 
-1. **¿Ver las 11 vacantes actuales antes de sembrar?** (ver 1.1)
+1. **¿Ver las 18 vacantes actuales antes de sembrar?** (ver 1.1)
 2. **¿Repo público o privado?** (ver 1.2 — afecta el costo de Actions)
 3. **P&G: Phenom o Workday.** Hoy está activo `type: pg` (Phenom) y la entrada de
    Workday quedó comentada en `config/sources.yaml`. Son **la misma bolsa**: el botón
    "Aplicar" de Phenom redirige a `pg.wd5.myworkdayjobs.com`. Devuelven las mismas
    2 vacantes con IDs distintos (`pg-R000151170` vs `wd-pg-R000151170`), así que
    si activás las dos vas a recibir todo duplicado — el dedupe no las puede
-   cruzar. Dejar una sola. **Cisco es el mismo caso** (`cisco.wd5` /
-   `Cisco_Careers`): hoy está activo `type: cisco` (Phenom) y no hay entrada de
+   cruzar. Dejar una sola. **Cisco y HPE son el mismo caso** (`cisco.wd5/Cisco_Careers`
+   y `hpe.wd5/Jobsathpe`): hoy están activos como Phenom y no hay entrada de
    Workday; si algún día se agrega, sacar una de las dos.
 
 ---
@@ -163,8 +163,16 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
   responde 200 aunque no se mande — pero se manda igual.
 - **Phenom, campos del payload**: `pageId`/`pageName`/`pageType` describen desde
   qué página busca la UI y **no cambian los resultados**; el filtro real es
-  `selected_fields`. Se pagina con `from`/`size` y Cisco acepta `size: 100`
-  (Workday, en cambio, topa en 20).
+  `selected_fields`. Se pagina con `from`/`size` y Cisco y HPE aceptan
+  `size: 100` (Workday, en cambio, topa en 20). El `lang`/`country` del payload
+  es el mercado del **sitio**, no un filtro: HPE corre en `en_us`/`us` y aun así
+  devuelve las vacantes de Costa Rica.
+- **Phenom, vacantes multi-ubicación**: en HPE, 8 de las 20 de Costa Rica tienen
+  la sede principal en otro país (Texas, India, México) y Heredia como sede
+  adicional. Salen bien del filtro de país, pero `cityStateCountry` muestra solo
+  la principal y `multi_location` lista las ciudades **sin país**, así que el
+  fetcher les anota "(+N ubicaciones, incluye Costa Rica)". Si se saca esa
+  anotación, el `location_hints` del bot las descarta en silencio.
 - **Telegram**: los mensajes van en **HTML, no Markdown**. Títulos reales como
   `FP&A Analyst` o `Support (French, English)` rompen el parser Markdown y el
   envío falla con HTTP 400.

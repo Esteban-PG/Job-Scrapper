@@ -63,6 +63,10 @@ sources:
   - type: cisco
     countries: ["Costa Rica"]
 
+  # HPE — Phenom igual que los dos de arriba (sitio en el mercado en_us).
+  - type: hpe
+    countries: ["Costa Rica"]
+
   # ---- Ejemplos: descomentá y ajustá ---------------------------------------
 
   # Otra bolsa Phenom cualquiera (una que no tenga preset en phenom.py). Los
