@@ -1,0 +1,11 @@
+# Base de vacantes ya vistas: es estado local, no código.
+# En GitHub Actions se persiste con actions/cache (ver .github/workflows/).
+data/seen_jobs.db
+
+# Credenciales. La plantilla versionada es .env.example (siempre vacía).
+.env
+
+.venv/
+__pycache__/
+*.pyc
+.DS_Store

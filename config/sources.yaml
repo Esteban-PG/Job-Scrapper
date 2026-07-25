@@ -1,0 +1,97 @@
+# Fuentes del bot de alertas de empleo.
+#
+# Agregar una bolsa = agregar una entrada acá. No se toca código, salvo que la
+# plataforma sea una que todavía no tiene plantilla.
+#
+# Cómo clasificar una bolsa nueva (mirá la URL de la página de vacantes):
+#   boards.greenhouse.io/<empresa>   -> type: greenhouse   (company)
+#   jobs.lever.co/<empresa>          -> type: lever        (company)
+#   jobs.ashbyhq.com/<empresa>       -> type: ashby        (company)
+#   <tenant>.<dc>.myworkdayjobs.com  -> type: workday      (tenant, site, dc)
+#   dominio con /widgets (Phenom)    -> type: pg           (plantilla P&G)
+#   nada de lo anterior              -> type: html         (selector CSS)
+#
+# LinkedIn e Indeed NO van acá: bloquean el scraping a propósito. Para esas dos
+# se usan sus alertas nativas por correo + una regla en Gmail.
+
+filters:
+  # Se evalúan sobre "<título> <ubicación>", en minúsculas, como regex.
+  # Si un título matchea EXCLUDE, se descarta aunque matchee INCLUDE.
+  include:
+    - '\bjunior\b'
+    - '\bjr\b'
+    - '\bentry.?level\b'
+    - '\bdata\b'
+    - '\bsoftware\b'
+    - '\bqa\b'
+    - '\banalyst\b'
+    - '\bengineer\b'
+  exclude:
+    - '\bsenior\b'
+    - '\bstaff\b'
+    - '\bprincipal\b'
+    - '\blead\b'
+    - '\bmanager\b'
+    - '\bdirector\b'
+    - '\bsr\.?\b'
+    - '\bhead of\b'
+  # Pista de ubicación. Dejalo vacío ([]) para no filtrar por ubicación —
+  # útil cuando la fuente ya viene filtrada a Costa Rica desde el origen.
+  location_hints:
+    - 'remote'
+    - 'remoto'
+    - 'latam'
+    - 'americas'
+    - 'costa rica'
+    - 'anywhere'
+    - 'heredia'
+    - 'san jose'
+    - 'san josé'
+
+sources:
+  # ---- Verificadas en vivo -------------------------------------------------
+
+  # Equifax — feed XML con el catálogo completo (1 request, sin paginar).
+  - type: equifax
+    countries: ["Costa Rica"]
+
+  # P&G — plataforma Phenom (POST a /widgets con x-csrf-token).
+  - type: pg
+
+  # ---- Ejemplos: descomentá y ajustá ---------------------------------------
+
+  # Workday. tenant/dc/site salen de la URL de la bolsa:
+  #   https://pg.wd5.myworkdayjobs.com/1000  ->  tenant: pg, dc: wd5, site: "1000"
+  # `countries` usa el nombre tal como lo muestra el filtro del sitio; el
+  # fetcher lo traduce solo al ID de facet que Workday espera.
+  #
+  # OJO: esta entrada es la MISMA bolsa que `type: pg` de arriba (el "Aplicar"
+  # de Phenom redirige acá). Activá una u otra, no las dos, o vas a recibir
+  # cada vacante dos veces — los IDs son distintos (`pg-` vs `wd-pg-`) y el
+  # dedupe no las puede cruzar.
+  # - type: workday
+  #   tenant: pg
+  #   dc: wd5
+  #   site: "1000"
+  #   countries: ["Costa Rica"]
+  #   name: "P&G"
+
+  # - type: greenhouse
+  #   company: nombre-en-la-url
+  #   name: "Empresa X"
+
+  # - type: lever
+  #   company: nombre-en-la-url
+  #   name: "Empresa Y"
+
+  # - type: ashby
+  #   company: nombre-en-la-url
+  #   name: "Empresa Z"
+
+  # HTML plano: último recurso cuando no hay API. El selector se saca con
+  # DevTools; conviene que apunte al <a> de cada vacante.
+  # - type: html
+  #   name: "Bolsa genérica"
+  #   url: "https://ejemplo.com/careers"
+  #   item_selector: "a.job-link"
+  #   base_url: "https://ejemplo.com"

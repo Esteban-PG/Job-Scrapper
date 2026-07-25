@@ -1,0 +1,3 @@
+# Acá vive `seen_jobs.db` (la base de vacantes ya vistas), que está en
+# .gitignore porque es estado local, no código. Este archivo existe solo para
+# que la carpeta viaje en el repo.

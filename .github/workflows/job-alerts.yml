@@ -1,0 +1,67 @@
+name: Alertas de empleo
+
+on:
+  schedule:
+    # Cada 30 minutos = ~1440 corridas/mes. GitHub cobra por minuto redondeado
+    # hacia arriba, y el plan Free da 2000 min/mes en repos privados: a este
+    # ritmo entra, a */15 se pasaría. En repo público no se cobra nada.
+    #
+    # GitHub tampoco garantiza puntualidad en los cron (bajo carga se atrasa y
+    # a veces saltea una corrida); acá da igual, nadie llena una vacante en
+    # media hora.
+    - cron: "*/30 * * * *"
+  workflow_dispatch:        # botón "Run workflow" para probar a mano
+
+# Dos corridas en paralelo se pisarían la base de vistos y podrían notificar
+# duplicados: que espere la anterior.
+concurrency:
+  group: job-alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # ---------------------------------------------------------------
+      # Persistencia de seen_jobs.db entre corridas.
+      #
+      # Sin esto el runner arranca limpio cada vez, la base sale vacía, el bot
+      # cree que es la primera corrida y re-notifica TODO en cada ejecución.
+      #
+      # La key lleva el run_id (siempre distinto) para que cada corrida guarde
+      # una entrada nueva — las caches de Actions son inmutables, sobrescribir
+      # una key existente no funciona. `restore-keys` con el prefijo recupera
+      # la más reciente. El `save` va aparte y con `always()` para que la base
+      # se guarde aunque el bot termine en error.
+      # ---------------------------------------------------------------
+      - name: Restaurar base de vistos
+        uses: actions/cache/restore@v4
+        with:
+          path: data/seen_jobs.db
+          key: seen-jobs-${{ github.run_id }}
+          restore-keys: |
+            seen-jobs-
+
+      - name: Revisar bolsas de empleo
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python run.py
+
+      - name: Guardar base de vistos
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/seen_jobs.db
+          key: seen-jobs-${{ github.run_id }}
