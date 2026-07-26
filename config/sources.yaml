@@ -67,6 +67,10 @@ sources:
   - type: hpe
     countries: ["Costa Rica"]
 
+  # Moody's — Radancy/TalentBrew (GET que devuelve HTML adentro de un JSON).
+  - type: moodys
+    countries: ["Costa Rica"]
+
   # Amazon — ATS propio (amazon.jobs), 1 POST sin token ni cookies.
   # `countries` acepta el nombre o el código ISO-2 ("CR").
   #
@@ -100,6 +104,16 @@ sources:
   #   page_id: "page123-prod"
   #   ref_num: "XXXGLOBAL"
   #   id_prefix: "empresaw"
+  #   countries: ["Costa Rica"]
+
+  # Otra bolsa Radancy/TalentBrew (assets en tbcdn.talentbrew.com). Hacen falta
+  # el dominio y el `OrganizationIds` del request. El país tiene que estar en
+  # COUNTRY_GEO (jobbot/fetchers/radancy.py) — Radancy filtra por nodo
+  # geográfico, no por nombre.
+  # - type: radancy
+  #   name: "Empresa V"
+  #   site: "https://careers.empresav.com"
+  #   org_id: "12345"
   #   countries: ["Costa Rica"]
 
   # Workday. tenant/dc/site salen de la URL de la bolsa:

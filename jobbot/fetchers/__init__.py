@@ -24,6 +24,7 @@ from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
 from .phenom import fetch_cisco, fetch_hpe, fetch_pg, fetch_phenom
+from .radancy import fetch_moodys, fetch_radancy
 from .workday import fetch_workday
 
 FETCHERS = {
@@ -42,6 +43,15 @@ FETCHERS = {
     "pg": lambda s: fetch_pg(countries=s.get("countries", ["Costa Rica"])),
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),
+    "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
+    # Cualquier otra bolsa Radancy/TalentBrew: sale de sources.yaml.
+    "radancy": lambda s: fetch_radancy(
+        site=s["site"],
+        org_id=s["org_id"],
+        countries=s.get("countries", ["Costa Rica"]),
+        name=s.get("name"),
+        keywords=s.get("keywords", ""),
+    ),
     # Cualquier otra bolsa Phenom: los valores salen de sources.yaml.
     "phenom": lambda s: fetch_phenom(
         site=s["site"],

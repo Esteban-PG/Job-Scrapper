@@ -12,8 +12,9 @@ su frecuencia y su propio ruido — por **un solo feed filtrado**.
 23:15:51  INFO  pg                   2 vacantes ·   0 nuevas ·   0 notificadas
 23:15:53  INFO  cisco                4 vacantes ·   1 nueva  ·   1 notificada
 23:15:56  INFO  hpe                 20 vacantes ·   2 nuevas ·   1 notificada
-23:15:58  INFO  amazon              73 vacantes ·   5 nuevas ·   2 notificadas
-23:15:58  INFO  total: 110 vacantes · 11 nuevas · 6 notificadas · 5/5 fuentes ok
+23:15:58  INFO  moodys              22 vacantes ·   3 nuevas ·   2 notificadas
+23:16:00  INFO  amazon               8 vacantes ·   1 nueva  ·   1 notificada
+23:16:00  INFO  total: 67 vacantes · 9 nuevas · 6 notificadas · 6/6 fuentes ok
 ```
 
 ```
@@ -38,6 +39,7 @@ número 16 pasa a ser una entrada en un YAML.
 | Workday | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/` | ✅ verificada en vivo |
 | Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco, HPE) |
 | Equifax | feed XML propio | 1 GET al feed | ✅ verificada en vivo |
+| Radancy / TalentBrew | assets en `tbcdn.talentbrew.com` | GET con HTML adentro del JSON | ✅ verificada en vivo (Moody's) |
 | Amazon | `amazon.jobs/api/jobs/search` | 1 POST, sin token | ✅ verificada en vivo |
 | JS pesado sin API | nada en la pestaña Network | Playwright | último recurso, sin casos aún |
 
@@ -114,6 +116,7 @@ sigue viva:
 python jobbot/fetchers/equifax.py
 python jobbot/fetchers/phenom.py    # P&G, Cisco y HPE
 python jobbot/fetchers/workday.py
+python jobbot/fetchers/radancy.py   # Moody's
 python jobbot/fetchers/amazon.py
 ```
 
@@ -157,6 +160,9 @@ sources:
     countries: ["Costa Rica"]
 
   - type: cisco                    # preset Phenom, igual que `pg` y `hpe`
+    countries: ["Costa Rica"]
+
+  - type: moodys                   # preset Radancy
     countries: ["Costa Rica"]
 
   - type: amazon                   # amazon.jobs; acepta nombre o ISO-2 ("CR")
@@ -293,6 +299,19 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
   alguna rareza suelta (P&G manda un bloque `locationData` de slider que los
   otros no tienen). Por eso el fetcher está parametrizado y cada empresa es un
   preset de la misma función.
+- **Radancy / Moody's: el filtro de ubicación es todo-o-nada.** Solo se aplica
+  si van los **cinco** parámetros juntos (`Location`, `LocationPath`,
+  `Latitude`, `Longitude`, `LocationType=2`). Con cualquier combinación parcial
+  la API **no falla**: devuelve el catálogo global — 251 vacantes en vez de 22.
+  Probé las cinco combinaciones para confirmarlo. Como `location_hints` incluye
+  "remote", ese fallo silencioso habría metido vacantes remotas de cualquier
+  país, así que el fetcher **revalida localmente** que cada vacante mencione el
+  país y avisa por log si tuvo que descartar algo. Verificado rompiendo el
+  filtro a propósito: devuelve las 22 correctas y loguea el aviso.
+- **Radancy filtra por nodo geográfico**, no por nombre: Costa Rica es
+  `LocationPath=3624060` (GeoNames) más sus coordenadas. Un ID inválido también
+  cae en el catálogo global en silencio, así que los de `COUNTRY_GEO` están
+  verificados uno por uno contra Moody's.
 - **Amazon** no usa un ATS de terceros, tiene el suyo (`sourceSystem:
   JobCreator`), pero la API es la más simple de todas: un POST sin token ni
   cookies y `size: 100` trae las 73 de Costa Rica de una. Dos trampas: en
@@ -342,6 +361,7 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
 | P&G (Phenom) | ✅ 2 vacantes en Costa Rica |
 | Cisco (Phenom) | ✅ 4 vacantes en Costa Rica (de 1023 globales) |
 | HPE (Phenom) | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede |
+| Moody's (Radancy) | ✅ 22 vacantes en Costa Rica (de 251 globales) |
 | Amazon (ATS propio) | ✅ 8 vacantes técnicas en Costa Rica (73 sin filtrar por categoría) |
 | Workday (tenant `pg`) | ✅ 2 vacantes, mismas que Phenom |
 | Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía |
@@ -372,6 +392,7 @@ jobbot/
     amazon.py             amazon.jobs (POST sin token)
     equifax.py            feed XML
     phenom.py             Phenom (POST + CSRF en un JWT) + presets P&G/Cisco/HPE
+    radancy.py            Radancy/TalentBrew (HTML adentro del JSON) + Moody's
     workday.py            Workday (POST CXS + facets)
     generic_html.py       último recurso: selector CSS
 .github/workflows/job-alerts.yml
