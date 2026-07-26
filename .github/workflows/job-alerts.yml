@@ -36,8 +36,11 @@ jobs:
       # ---------------------------------------------------------------
       # Persistencia de seen_jobs.db entre corridas.
       #
-      # Sin esto el runner arranca limpio cada vez, la base sale vacía, el bot
-      # cree que es la primera corrida y re-notifica TODO en cada ejecución.
+      # Sin esto el runner arranca limpio cada vez, la base sale vacía y el bot
+      # cree que es la primera corrida: siembra en silencio y no notifica NADA.
+      # Ojo con esto, que es contraintuitivo — la falla no es recibir todo
+      # duplicado, es no recibir nunca más nada, y desde afuera se lee igual que
+      # "no salieron vacantes nuevas".
       #
       # La key lleva el run_id (siempre distinto) para que cada corrida guarde
       # una entrada nueva — las caches de Actions son inmutables, sobrescribir

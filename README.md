@@ -107,7 +107,13 @@ Flags útiles:
 | `--dry-run` | Imprime en vez de notificar y no escribe la base |
 | `--source equifax` | Corre una sola fuente (por tipo o por nombre) |
 | `--config otro.yaml` | Usa otro archivo de fuentes |
+| `--no-seed` | Con la base vacía, notifica en vez de sembrar en silencio |
 | `-v` | Logging en DEBUG |
+
+`--no-seed` existe para el arranque: con la base vacía, la corrida normal se
+traga las vacantes que **ya estaban publicadas** (ver *Decisiones de diseño*).
+Si querés recibirlas una vez antes de que la base las dé por vistas, esa primera
+corrida va con `--no-seed`. Con la base ya poblada el flag no cambia nada.
 
 Cada fetcher también corre solo, que es la forma rápida de ver si una fuente
 sigue viva:
@@ -209,11 +215,13 @@ GitHub — no hace falta dejar la computadora prendida. Solo hay que cargar
 Actions*.
 
 **El detalle que importa:** el runner arranca limpio en cada corrida. Si no se
-persiste `data/seen_jobs.db`, la base sale vacía, el bot cree que es su primera
-corrida y re-notifica todo, cada 30 minutos, para siempre. El workflow lo
-resuelve con `actions/cache`: como las caches de Actions son inmutables, la key
-lleva el `run_id` (siempre distinta) y `restore-keys` recupera la más reciente
-por prefijo.
+persiste `data/seen_jobs.db`, la base sale vacía y el bot cree que es su primera
+corrida, **cada vez**: siembra en silencio y no notifica nada, nunca. La falla no
+avisa — desde el chat se lee igual que "esta semana no salió nada", y por eso hay
+que verificarla a mano (ver `TODO.md`, 1.3). El workflow lo resuelve con
+`actions/cache`: como las caches de Actions son inmutables, la key lleva el
+`run_id` (siempre distinta) y `restore-keys` recupera la más reciente por
+prefijo.
 
 Tres advertencias de GitHub Actions que conviene saber:
 
@@ -245,7 +253,9 @@ Acá `data/seen_jobs.db` persiste solo, que es la ventaja principal.
 
 - **La primera corrida no notifica.** Si la base está vacía, se llena con todo
   lo que hay pero no se avisa nada; si no, el bot arranca con una avalancha de
-  vacantes viejas. Desde la segunda corrida solo avisa lo nuevo.
+  vacantes viejas. Desde la segunda corrida solo avisa lo nuevo. El costo es que
+  las vacantes ya publicadas no llegan nunca, así que el flag `--no-seed` deja
+  hacer el arranque al revés: notificar esa tanda inicial y sembrar con ella.
 - **Traer todo y filtrar local.** Los fetchers no filtran por palabra clave en
   el origen (`subsearch` vacío en Phenom, `searchText` vacío en Workday). Cada
   sitio indexa distinto y una búsqueda por "junior" se come vacantes que sí

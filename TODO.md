@@ -19,24 +19,25 @@ Funcionando y verificado en vivo:
 Hoy el bot revisa **6 fuentes** (Equifax + P&G + Cisco + HPE + Moody's +
 Amazon) y encuentra 67 vacantes, 34 de las cuales pasan el filtro.
 
+Base local **ya sembrada** con esas 67 y las 34 ya llegaron a Telegram (ver 1.1).
+
 Falta: subirlo, activarlo, y cargarle las otras 9 bolsas.
 
 ---
 
 ## 1. Dejarlo corriendo (camino crítico, en este orden)
 
-### 1.1 Sembrar la base — decisión previa
+### 1.1 Sembrar la base — hecho
 
-`data/seen_jobs.db` todavía no existe. La primera corrida real siembra las 67 vacantes
-actuales **en silencio** (por diseño, para no recibir una avalancha). Efecto
-secundario: las **34 vacantes que hoy pasan el filtro nunca te van a llegar**
-(7 de Equifax, 4 de Cisco, 7 de HPE, 10 de Moody's y 6 de Amazon).
-
-- [ ] **Decidir**: ¿querés recibir esas 34 una vez antes de sembrar, o arrancar
-      limpio y ver solo lo que aparezca de ahora en adelante?
-  - Arrancar limpio → `python run.py` (siembra y calla).
-  - Verlas primero → pedirlo antes de la primera corrida; después ya no se puede
-    sin borrar la base.
+- [x] **Base sembrada el 25 de julio de 2026** con las 67 vacantes de las 6
+      fuentes. Se corrió `python run.py --no-seed`, así que las **34 que pasan el
+      filtro se enviaron a Telegram** en esa misma corrida (7 Equifax, 4 Cisco,
+      7 HPE, 10 Moody's, 6 Amazon) en vez de perderse en el sembrado silencioso.
+- [x] Dedupe verificado local: una segunda corrida seguida devolvió `0 nuevas`
+      en las 6 fuentes y no mandó nada.
+- El flag `--no-seed` quedó en el CLI para el mismo caso a futuro: con la base
+  vacía notifica en vez de sembrar en silencio. Con la base ya poblada no hace
+  nada, así que es inofensivo dejarlo puesto.
 
 ### 1.2 Repo git
 
@@ -68,11 +69,18 @@ gh repo create job-alert-bot --public --source=. --push
       `TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID` (los valores están en tu `.env` local).
 - [ ] Correr el workflow a mano una vez: pestaña *Actions* → "Alertas de empleo"
       → *Run workflow*. Esa corrida siembra la base y no debería notificar nada.
-- [ ] **Verificar que la caché de la base funciona** — es el punto que más
-      fácil se rompe y el más silencioso: si falla, el bot re-notifica todo cada
-      30 minutos. Correr el workflow **una segunda vez** a mano y confirmar en
-      el log que dice `0 nuevas`. Si dice que sembró de nuevo, la caché no está
-      restaurando y hay que revisar el paso *Restaurar base de vistos*.
+      **Ojo**: `data/seen_jobs.db` está en `.gitignore`, así que la base sembrada
+      local **no viaja al runner** — Actions arranca con la caché vacía y siembra
+      de nuevo, en silencio. No vas a recibir las 34 repetidas; lo único que se
+      pierde es lo que se publique entre hoy y esa primera corrida.
+- [ ] **Verificar que la caché de la base funciona** — es el punto que más fácil
+      se rompe y el más silencioso: si falla, la base llega vacía en cada
+      corrida, el bot la toma por primera corrida y **siembra en silencio para
+      siempre**. No te llega nada nunca más, y parece que simplemente no hay
+      vacantes nuevas. Correr el workflow **una segunda vez** a mano y confirmar
+      en el log que dice `0 nuevas`. Si dice `sembrando (sin notificar)`, la
+      caché no está restaurando y hay que revisar el paso *Restaurar base de
+      vistos*.
 - [ ] Confirmar que la corrida programada arranca sola en el próximo :00 o :30
       (los cron de GitHub se atrasan; puede tardar unos minutos de más).
 
@@ -136,7 +144,8 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
 
 ## Decisiones abiertas
 
-1. **¿Ver las 18 vacantes actuales antes de sembrar?** (ver 1.1)
+1. ~~¿Ver las vacantes actuales antes de sembrar?~~ **Resuelto**: se enviaron las
+   34 a Telegram y la base quedó sembrada en la misma corrida (ver 1.1).
 2. **¿Repo público o privado?** (ver 1.2 — afecta el costo de Actions)
 3. **P&G: Phenom o Workday.** Hoy está activo `type: pg` (Phenom) y la entrada de
    Workday quedó comentada en `config/sources.yaml`. Son **la misma bolsa**: el botón
@@ -211,6 +220,7 @@ python jobbot/fetchers/equifax.py   # probar un fetcher aislado
 
 # Empezar de cero (¡vuelve a sembrar y no notifica esa corrida!)
 rm data/seen_jobs.db
+python run.py --no-seed             # …salvo que quieras recibir la tanda inicial
 ```
 
 Config: `config/sources.yaml` (fuentes + filtros) · Credenciales: `.env` (local) y

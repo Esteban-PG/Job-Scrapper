@@ -67,6 +67,9 @@ def main():
     ap = argparse.ArgumentParser(description="Bot de alertas de empleo")
     ap.add_argument("--dry-run", action="store_true",
                     help="imprime en vez de notificar y no toca la base")
+    ap.add_argument("--no-seed", action="store_true",
+                    help="con la base vacía, notifica todo lo que pase el filtro "
+                         "en vez de sembrar en silencio")
     ap.add_argument("--source", metavar="NOMBRE",
                     help="corre solo las fuentes cuyo tipo o nombre coincida")
     ap.add_argument("--config", default=CONFIG_PATH, help="ruta al sources.yaml")
@@ -95,10 +98,17 @@ def main():
         return 1
 
     con = init_db(DB_PATH)
-    first_run = is_empty(con)
+    empty_db = is_empty(con)
+    # --no-seed desactiva el atajo de primera corrida: sirve para ver (o recibir)
+    # de una vez las vacantes que ya están publicadas, antes de que la base las
+    # dé por vistas. Después de esa corrida la base ya no está vacía y el flag
+    # deja de tener efecto.
+    first_run = empty_db and not args.no_seed
 
     if first_run:
         log.info("base vacía: primera corrida, se siembra sin notificar")
+    elif empty_db:
+        log.info("base vacía y --no-seed: se notifica todo lo que pase el filtro")
     if args.dry_run:
         log.info("modo dry-run: no se notifica ni se escribe la base")
     if not (TG_TOKEN and TG_CHAT):
