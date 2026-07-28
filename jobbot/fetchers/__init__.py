@@ -1,22 +1,22 @@
 """
-Registro de fetchers: `type` de `sources.yaml` -> función que trae las vacantes.
+Fetcher registry: `type` from `sources.yaml` -> function that fetches postings.
 
-Cada fetcher devuelve una lista de dicts con el MISMO schema, y no sabe nada de
-filtros ni de notificaciones. Ese contrato es lo que permite que el orquestador
-no tenga que saber de qué plataforma vino cada vacante:
+Every fetcher returns a list of dicts with the SAME schema, and knows nothing
+about filters or notifications. That contract is what lets the orchestrator not
+care which platform each posting came from:
 
     {
-        "id":       "efx-J00178026",   # único y ESTABLE, con prefijo de fuente
+        "id":       "efx-J00178026",   # unique and STABLE, prefixed by source
         "title":    "Billing Analyst - Junior",
         "location": "Heredia, Costa Rica",
         "url":      "https://...",
         "source":   "Equifax",
-        "category": "Accounting",      # opcional
-        "posted":   "2026-07-20",      # opcional
+        "category": "Accounting",      # optional
+        "posted":   "2026-07-20",      # optional
     }
 
-Para agregar una plataforma nueva: un módulo acá con su `fetch_<algo>()`, y una
-entrada en FETCHERS. Nada más se toca.
+To add a new platform: a module here with its `fetch_<something>()`, and an
+entry in FETCHERS. Nothing else gets touched.
 """
 
 from .amazon import CATEGORIES_TECH, fetch_amazon
@@ -37,15 +37,15 @@ FETCHERS = {
         countries=s.get("countries", ["Costa Rica"]),
         name=s.get("name", "Amazon"),
         query=s.get("query", ""),
-        # `categories` ausente = las técnicas por defecto; `categories: []` =
-        # todas (son dos cosas distintas, por eso no se usa s.get(k, default)).
+        # `categories` absent = the technical ones by default; `categories: []` =
+        # all of them (two different things, hence no s.get(k, default)).
         categories=(s["categories"] if "categories" in s else CATEGORIES_TECH),
     ),
     "pg": lambda s: fetch_pg(countries=s.get("countries", ["Costa Rica"])),
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),
     "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
-    # Cualquier otra bolsa Radancy/TalentBrew: sale de sources.yaml.
+    # Any other Radancy/TalentBrew board: it comes from sources.yaml.
     "radancy": lambda s: fetch_radancy(
         site=s["site"],
         org_id=s["org_id"],
@@ -53,7 +53,7 @@ FETCHERS = {
         name=s.get("name"),
         keywords=s.get("keywords", ""),
     ),
-    # Cualquier otra bolsa Phenom: los valores salen de sources.yaml.
+    # Any other Phenom board: the values come from sources.yaml.
     "phenom": lambda s: fetch_phenom(
         site=s["site"],
         page_id=s["page_id"],

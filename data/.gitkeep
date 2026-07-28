@@ -1,3 +1,3 @@
-# Acá vive `seen_jobs.db` (la base de vacantes ya vistas), que está en
-# .gitignore porque es estado local, no código. Este archivo existe solo para
-# que la carpeta viaje en el repo.
+# This is where `seen_jobs.db` (the database of already-seen postings) lives.
+# It's in .gitignore because it's local state, not code. This file exists only
+# so the folder travels with the repo.

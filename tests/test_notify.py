@@ -1,21 +1,21 @@
 """
-Formato de los mensajes de Telegram.
+Formatting of the Telegram messages.
 
-No se prueba el envío: `send()` sale a la red y estos tests corren sin
-credenciales. Lo que se prueba es lo que se le manda a Telegram, que es donde
-estuvieron los bugs reales — un título con `&` rompía el parser y el envío
-fallaba con HTTP 400.
+Sending isn't tested: `send()` goes out to the network and these tests run
+without credentials. What is tested is what gets handed to Telegram, which is
+where the real bugs were — a title with `&` broke the parser and the send failed
+with HTTP 400.
 """
 
 from jobbot.notify import (as_plain_text, format_health_message,
                            format_message, humanize)
 
-LIMITE_TELEGRAM = 4096
+TELEGRAM_LIMIT = 4096
 
 
-# --- vacantes -------------------------------------------------------------
+# --- postings -------------------------------------------------------------
 
-def test_el_mensaje_lleva_titulo_ubicacion_y_enlace():
+def test_the_message_carries_title_location_and_link():
     msg = format_message({
         "title": "Junior Data Analyst",
         "location": "Heredia, Costa Rica",
@@ -28,93 +28,93 @@ def test_el_mensaje_lleva_titulo_ubicacion_y_enlace():
     assert "https://careers.equifax.com/j/1" in msg
 
 
-def test_escapa_los_titulos_que_rompian_el_parser():
-    """`FP&A Analyst` es un título real: sin escapar, Telegram devuelve 400."""
+def test_it_escapes_the_titles_that_broke_the_parser():
+    """`FP&A Analyst` is a real title: unescaped, Telegram returns a 400."""
     msg = format_message({"title": "FP&A Analyst", "url": "", "source": ""})
     assert "FP&amp;A" in msg
     assert "FP&A " not in msg
 
 
-def test_escapa_html_incrustado_en_el_titulo():
+def test_it_escapes_html_embedded_in_the_title():
     msg = format_message({"title": "Dev <script>alert(1)</script>",
                           "url": "", "source": ""})
     assert "<script>" not in msg
     assert "&lt;script&gt;" in msg
 
 
-def test_tolera_una_vacante_sin_campos_opcionales():
+def test_it_tolerates_a_posting_without_optional_fields():
     msg = format_message({})
-    assert "Sin título" in msg
+    assert "Untitled" in msg
 
 
-def test_as_plain_text_deja_el_mensaje_legible_en_consola():
-    """Es lo que se imprime con --dry-run y sin credenciales."""
-    plano = as_plain_text(format_message({
+def test_as_plain_text_keeps_the_message_readable_in_a_console():
+    """It's what gets printed with --dry-run and without credentials."""
+    plain = as_plain_text(format_message({
         "title": "FP&A Analyst", "location": "Heredia", "source": "Moody's",
         "url": "https://x.com/1",
     }))
-    assert "FP&A Analyst" in plano
-    assert "<b>" not in plano and "&amp;" not in plano
+    assert "FP&A Analyst" in plain
+    assert "<b>" not in plain and "&amp;" not in plain
 
 
-# --- duraciones -----------------------------------------------------------
+# --- durations ------------------------------------------------------------
 
-def test_humanize_redondea_hacia_unidades_legibles():
-    assert humanize(30) == "1 min"       # nunca "0 min"
+def test_humanize_rounds_to_readable_units():
+    assert humanize(30) == "1 min"        # never "0 min"
     assert humanize(2700) == "45 min"
     assert humanize(7200) == "2 h"
-    assert humanize(86400) == "1 día"    # singular
-    assert humanize(172800) == "2 días"
+    assert humanize(86400) == "1 day"     # singular
+    assert humanize(172800) == "2 days"
 
 
-# --- avisos de fuente caída ----------------------------------------------
+# --- down-source alerts ---------------------------------------------------
 
-def test_aviso_de_una_sola_fuente_caida():
+def test_alert_for_a_single_down_source():
     msg = format_health_message([("moodys", "HTTPError: 503", 2)], [])
-    assert "Fuente caída" in as_plain_text(msg)
+    assert "Source down" in as_plain_text(msg)
     assert "moodys" in msg
     assert "503" in msg
-    assert "2 corridas" in msg
+    assert "2 failed runs" in msg
 
 
-def test_titulo_en_plural_con_varias_fuentes():
+def test_plural_title_with_several_sources():
     msg = as_plain_text(format_health_message(
         [("moodys", "err", 2), ("hpe", "err", 2)], []))
-    assert "2 fuentes caídas" in msg
+    assert "2 sources down" in msg
 
 
-def test_aviso_de_recuperacion_incluye_cuanto_estuvo_caida():
+def test_recovery_alert_includes_how_long_it_was_down():
     msg = as_plain_text(format_health_message([], [("equifax", 7200)]))
-    assert "Fuente recuperada" in msg
+    assert "Source recovered" in msg
     assert "equifax" in msg
     assert "2 h" in msg
 
 
-def test_caidas_y_recuperaciones_van_en_el_mismo_mensaje():
+def test_outages_and_recoveries_go_in_the_same_message():
     msg = as_plain_text(format_health_message(
         [("moodys", "err", 2)], [("equifax", 3600)]))
     assert "moodys" in msg and "equifax" in msg
 
 
-def test_el_error_se_recorta():
-    """Una respuesta de error puede traer un HTML entero."""
+def test_the_error_gets_trimmed():
+    """An error response may carry a whole HTML page."""
     msg = format_health_message([("moodys", "X" * 5000, 2)], [])
     assert len(msg) < 500
 
 
-def test_el_error_se_escapa_como_html():
-    """Un error con HTML adentro rompería el mensaje entero."""
+def test_the_error_gets_escaped_as_html():
+    """An error with HTML inside would break the whole message."""
     msg = format_health_message(
         [("moodys", "<html><body>500</body></html>", 2)], [])
     assert "<html>" not in msg
     assert "&lt;html&gt;" in msg
 
 
-def test_muchas_fuentes_caidas_no_pasan_el_limite_de_telegram():
-    """Si se cae la red del runner fallan todas juntas, y es justo cuando no
-    querés perder el aviso por un 400."""
-    rotas = [(f"fuente-{i}", "HTTPError: 503 " + "x" * 200, 2) for i in range(15)]
-    msg = format_health_message(rotas, [])
-    assert len(msg) < LIMITE_TELEGRAM
-    assert "y 7 más" in as_plain_text(msg)
-    assert "fuente-14" in msg          # las que no se detallan igual se nombran
+def test_many_down_sources_do_not_pass_the_telegram_limit():
+    """If the runner's network goes down they all fail at once, and that's
+    exactly when you don't want to lose the alert to a 400."""
+    broken = [(f"source-{i}", "HTTPError: 503 " + "x" * 200, 2) for i in range(15)]
+    msg = format_health_message(broken, [])
+    assert len(msg) < TELEGRAM_LIMIT
+    assert "and 7 more" in as_plain_text(msg)
+    assert "source-14" in msg          # the ones not detailed are still named

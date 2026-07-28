@@ -1,26 +1,26 @@
-name: Alertas de empleo
+name: Job alerts
 
 on:
   schedule:
-    # Cada 30 minutos, pero en :07 y :37 y NO en :00/:30, que es donde programa
-    # todo el mundo y donde la cola de GitHub es más profunda.
+    # Every 30 minutes, but at :07 and :37 and NOT at :00/:30, which is where
+    # everybody schedules and where GitHub's queue is deepest.
     #
-    # Los cron de Actions son best-effort: bajo carga GitHub atrasa la corrida
-    # y, si el atraso se come el turno siguiente, la **descarta** (no la encola
-    # ni la recupera). Medido sobre las primeras 34 corridas con `*/30`: se
-    # ejecutó el 29% de lo programado, mediana de 83 min entre corridas, mínimo
-    # 59 min (nunca llegó a correr cada 30) y picos de casi 4 h. Correr en
-    # minutos impares es la única palanca gratis que existe contra esto.
+    # Actions cron schedules are best-effort: under load GitHub delays the run
+    # and, if the delay eats the next slot, it **discards** it (it doesn't queue
+    # it or recover it). Measured over the first 34 runs with `*/30`: it ran 29%
+    # of what was scheduled, a median of 83 min between runs, a minimum of 59 min
+    # (it never actually ran every 30) and peaks of almost 4 h. Running on odd
+    # minutes is the only free lever that exists against this.
     #
-    # Para vacantes de empleo el atraso da igual, y el dedupe evita duplicados
-    # sin importar cuándo corra. Frecuencia y costo: ~1440 corridas/mes, que en
-    # repo privado entrarían justo en los 2000 min/mes del plan Free; en repo
-    # público (este) los minutos son gratis e ilimitados.
+    # For job postings the delay doesn't matter, and the dedupe prevents
+    # duplicates no matter when it runs. Frequency and cost: ~1440 runs/month,
+    # which on a private repo would just about fit in the Free plan's 2000
+    # min/month; on a public repo (this one) the minutes are free and unlimited.
     - cron: "7,37 * * * *"
-  workflow_dispatch:        # botón "Run workflow" para probar a mano
+  workflow_dispatch:        # "Run workflow" button for manual testing
 
-# Dos corridas en paralelo se pisarían la base de vistos y podrían notificar
-# duplicados: que espere la anterior.
+# Two runs in parallel would step on the seen-jobs database and could notify
+# duplicates: make it wait for the previous one.
 concurrency:
   group: job-alerts
   cancel-in-progress: false
@@ -41,21 +41,22 @@ jobs:
       - run: pip install -r requirements.txt
 
       # ---------------------------------------------------------------
-      # Persistencia de seen_jobs.db entre corridas.
+      # Persistence of seen_jobs.db between runs.
       #
-      # Sin esto el runner arranca limpio cada vez, la base sale vacía y el bot
-      # cree que es la primera corrida: siembra en silencio y no notifica NADA.
-      # Ojo con esto, que es contraintuitivo — la falla no es recibir todo
-      # duplicado, es no recibir nunca más nada, y desde afuera se lee igual que
-      # "no salieron vacantes nuevas".
+      # Without this the runner starts clean every time, the database comes up
+      # empty and the bot believes it's the first run: it seeds silently and
+      # notifies NOTHING. Watch out for this one, it's counterintuitive — the
+      # failure isn't receiving everything duplicated, it's never receiving
+      # anything again, and from the outside it reads exactly like "no new
+      # postings came up".
       #
-      # La key lleva el run_id (siempre distinto) para que cada corrida guarde
-      # una entrada nueva — las caches de Actions son inmutables, sobrescribir
-      # una key existente no funciona. `restore-keys` con el prefijo recupera
-      # la más reciente. El `save` va aparte y con `always()` para que la base
-      # se guarde aunque el bot termine en error.
+      # The key carries the run_id (always different) so that each run saves a
+      # new entry — Actions caches are immutable, overwriting an existing key
+      # doesn't work. `restore-keys` with the prefix recovers the most recent
+      # one. The `save` is a separate step with `always()` so the database gets
+      # saved even if the bot ends in an error.
       # ---------------------------------------------------------------
-      - name: Restaurar base de vistos
+      - name: Restore seen-jobs database
         uses: actions/cache/restore@v6
         with:
           path: data/seen_jobs.db
@@ -63,13 +64,13 @@ jobs:
           restore-keys: |
             seen-jobs-
 
-      - name: Revisar bolsas de empleo
+      - name: Check the job boards
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python run.py
 
-      - name: Guardar base de vistos
+      - name: Save seen-jobs database
         if: always()
         uses: actions/cache/save@v6
         with:

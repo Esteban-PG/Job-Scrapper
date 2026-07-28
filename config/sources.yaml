@@ -1,22 +1,22 @@
-# Fuentes del bot de alertas de empleo.
+# Sources for the job alert bot.
 #
-# Agregar una bolsa = agregar una entrada acá. No se toca código, salvo que la
-# plataforma sea una que todavía no tiene plantilla.
+# Adding a board = adding an entry here. No code is touched, unless the platform
+# is one that doesn't have a template yet.
 #
-# Cómo clasificar una bolsa nueva (mirá la URL de la página de vacantes):
-#   boards.greenhouse.io/<empresa>   -> type: greenhouse   (company)
-#   jobs.lever.co/<empresa>          -> type: lever        (company)
-#   jobs.ashbyhq.com/<empresa>       -> type: ashby        (company)
+# How to classify a new board (look at the URL of its jobs page):
+#   boards.greenhouse.io/<company>   -> type: greenhouse   (company)
+#   jobs.lever.co/<company>          -> type: lever        (company)
+#   jobs.ashbyhq.com/<company>       -> type: ashby        (company)
 #   <tenant>.<dc>.myworkdayjobs.com  -> type: workday      (tenant, site, dc)
-#   dominio con /widgets (Phenom)    -> type: pg           (plantilla P&G)
-#   nada de lo anterior              -> type: html         (selector CSS)
+#   domain with /widgets (Phenom)    -> type: pg           (P&G template)
+#   none of the above                -> type: html         (CSS selector)
 #
-# LinkedIn e Indeed NO van acá: bloquean el scraping a propósito. Para esas dos
-# se usan sus alertas nativas por correo + una regla en Gmail.
+# LinkedIn and Indeed do NOT go here: they block scraping on purpose. For those
+# two, use their native email alerts + a Gmail rule.
 
 filters:
-  # Se evalúan sobre "<título> <ubicación>", en minúsculas, como regex.
-  # Si un título matchea EXCLUDE, se descarta aunque matchee INCLUDE.
+  # Evaluated against "<title> <location>", lowercased, as regexes.
+  # If a title matches EXCLUDE, it's discarded even if it matches INCLUDE.
   include:
     - '\bjunior\b'
     - '\bjr\b'
@@ -35,8 +35,8 @@ filters:
     - '\bdirector\b'
     - '\bsr\.?\b'
     - '\bhead of\b'
-  # Pista de ubicación. Dejalo vacío ([]) para no filtrar por ubicación —
-  # útil cuando la fuente ya viene filtrada a Costa Rica desde el origen.
+  # Location hint. Leave it empty ([]) to skip filtering by location — useful
+  # when the source already comes filtered to Costa Rica at the origin.
   location_hints:
     - 'remote'
     - 'remoto'
@@ -49,37 +49,37 @@ filters:
     - 'san josé'
 
 sources:
-  # ---- Verificadas en vivo -------------------------------------------------
+  # ---- Verified live -------------------------------------------------------
 
-  # Equifax — feed XML con el catálogo completo (1 request, sin paginar).
+  # Equifax — XML feed with the full catalog (1 request, no pagination).
   - type: equifax
     countries: ["Costa Rica"]
 
-  # P&G — plataforma Phenom (POST a /widgets con x-csrf-token).
+  # P&G — Phenom platform (POST to /widgets with an x-csrf-token).
   - type: pg
     countries: ["Costa Rica"]
 
-  # Cisco — también Phenom, mismo endpoint /widgets, otro dominio.
+  # Cisco — also Phenom, same /widgets endpoint, different domain.
   - type: cisco
     countries: ["Costa Rica"]
 
-  # HPE — Phenom igual que los dos de arriba (sitio en el mercado en_us).
+  # HPE — Phenom just like the two above (site on the en_us market).
   - type: hpe
     countries: ["Costa Rica"]
 
-  # Moody's — Radancy/TalentBrew (GET que devuelve HTML adentro de un JSON).
+  # Moody's — Radancy/TalentBrew (a GET that returns HTML inside a JSON).
   - type: moodys
     countries: ["Costa Rica"]
 
-  # Amazon — ATS propio (amazon.jobs), 1 POST sin token ni cookies.
-  # `countries` acepta el nombre o el código ISO-2 ("CR").
+  # Amazon — its own ATS (amazon.jobs), 1 POST with no token and no cookies.
+  # `countries` accepts the name or the ISO-2 code ("CR").
   #
-  # Es la ÚNICA fuente que además filtra por categoría en el origen: Amazon
-  # publica mucho que no es de ingeniería (ventas, diseño, soporte
-  # administrativo: 65 de las 73 de Costa Rica). Si se omite `categories`, se
-  # usan las técnicas por defecto (CATEGORIES_TECH en jobbot/fetchers/amazon.py).
-  # `categories: []` trae TODAS y deja que filtre el bot por título.
-  # Los nombres tienen que ser exactos; para verlos:
+  # It's the ONLY source that also filters by category at the origin: Amazon
+  # publishes a lot that isn't engineering (sales, design, administrative
+  # support: 65 of the 73 in Costa Rica). If `categories` is omitted, the
+  # technical defaults are used (CATEGORIES_TECH in jobbot/fetchers/amazon.py).
+  # `categories: []` brings ALL of them and lets the bot filter by title.
+  # The names have to be exact; to see them:
   #     python -m jobbot.fetchers.amazon --categories
   - type: amazon
     countries: ["Costa Rica"]
@@ -89,42 +89,42 @@ sources:
       - "Business Intelligence"
       - "Solutions Architect"
 
-  # ---- Ejemplos: descomentá y ajustá ---------------------------------------
+  # ---- Examples: uncomment and adjust --------------------------------------
 
-  # Otra bolsa Phenom cualquiera (una que no tenga preset en phenom.py). Los
-  # valores salen del POST a /widgets en DevTools → Network:
-  #   site       el dominio de la bolsa
-  #   page_id    campo `pageId` del payload
-  #   ref_num    campo `refNum`, si el sitio lo manda
-  #   id_prefix  prefijo del id de dedupe; que sea único entre fuentes
+  # Any other Phenom board (one with no preset in phenom.py). The values come
+  # from the POST to /widgets in DevTools → Network:
+  #   site       the board's domain
+  #   page_id    payload's `pageId` field
+  #   ref_num    payload's `refNum` field, if the site sends it
+  #   id_prefix  prefix of the dedupe id; make it unique across sources
   # - type: phenom
-  #   name: "Empresa W"
-  #   site: "https://careers.empresaw.com"
+  #   name: "Company W"
+  #   site: "https://careers.companyw.com"
   #   warmup_path: "/en/jobs"
   #   page_id: "page123-prod"
   #   ref_num: "XXXGLOBAL"
-  #   id_prefix: "empresaw"
+  #   id_prefix: "companyw"
   #   countries: ["Costa Rica"]
 
-  # Otra bolsa Radancy/TalentBrew (assets en tbcdn.talentbrew.com). Hacen falta
-  # el dominio y el `OrganizationIds` del request. El país tiene que estar en
-  # COUNTRY_GEO (jobbot/fetchers/radancy.py) — Radancy filtra por nodo
-  # geográfico, no por nombre.
+  # Any other Radancy/TalentBrew board (assets on tbcdn.talentbrew.com). You
+  # need the domain and the request's `OrganizationIds`. The country has to be
+  # in COUNTRY_GEO (jobbot/fetchers/radancy.py) — Radancy filters by geographic
+  # node, not by name.
   # - type: radancy
-  #   name: "Empresa V"
-  #   site: "https://careers.empresav.com"
+  #   name: "Company V"
+  #   site: "https://careers.companyv.com"
   #   org_id: "12345"
   #   countries: ["Costa Rica"]
 
-  # Workday. tenant/dc/site salen de la URL de la bolsa:
+  # Workday. tenant/dc/site come from the board's URL:
   #   https://pg.wd5.myworkdayjobs.com/1000  ->  tenant: pg, dc: wd5, site: "1000"
-  # `countries` usa el nombre tal como lo muestra el filtro del sitio; el
-  # fetcher lo traduce solo al ID de facet que Workday espera.
+  # `countries` uses the name exactly as the site's filter shows it; the fetcher
+  # translates it on its own into the facet ID Workday expects.
   #
-  # OJO: esta entrada es la MISMA bolsa que `type: pg` de arriba (el "Aplicar"
-  # de Phenom redirige acá). Activá una u otra, no las dos, o vas a recibir
-  # cada vacante dos veces — los IDs son distintos (`pg-` vs `wd-pg-`) y el
-  # dedupe no las puede cruzar.
+  # CAREFUL: this entry is the SAME board as `type: pg` above (Phenom's "Apply"
+  # redirects here). Enable one or the other, not both, or you'll receive every
+  # posting twice — the IDs are different (`pg-` vs `wd-pg-`) and the dedupe
+  # can't cross them.
   # - type: workday
   #   tenant: pg
   #   dc: wd5
@@ -133,21 +133,21 @@ sources:
   #   name: "P&G"
 
   # - type: greenhouse
-  #   company: nombre-en-la-url
-  #   name: "Empresa X"
+  #   company: name-in-the-url
+  #   name: "Company X"
 
   # - type: lever
-  #   company: nombre-en-la-url
-  #   name: "Empresa Y"
+  #   company: name-in-the-url
+  #   name: "Company Y"
 
   # - type: ashby
-  #   company: nombre-en-la-url
-  #   name: "Empresa Z"
+  #   company: name-in-the-url
+  #   name: "Company Z"
 
-  # HTML plano: último recurso cuando no hay API. El selector se saca con
-  # DevTools; conviene que apunte al <a> de cada vacante.
+  # Plain HTML: last resort when there's no API. The selector comes from
+  # DevTools; it should point at the <a> of each posting.
   # - type: html
-  #   name: "Bolsa genérica"
-  #   url: "https://ejemplo.com/careers"
+  #   name: "Generic board"
+  #   url: "https://example.com/careers"
   #   item_selector: "a.job-link"
-  #   base_url: "https://ejemplo.com"
+  #   base_url: "https://example.com"

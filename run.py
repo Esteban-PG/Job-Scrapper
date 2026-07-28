@@ -1,14 +1,14 @@
 """
-Punto de entrada del bot de alertas de empleo.
+Entry point of the job alert bot.
 
-    python run.py                    # revisa todo y notifica lo nuevo
-    python run.py --dry-run          # muestra qué notificaría, sin mandar nada
-    python run.py --source equifax   # corre una sola fuente
-    python run.py --no-seed          # con la base vacía, notifica en vez de sembrar
-    python run.py -v                 # logging DEBUG
+    python run.py                    # check everything and notify what's new
+    python run.py --dry-run          # show what it would notify, without sending
+    python run.py --source equifax   # run a single source
+    python run.py --no-seed          # with an empty database, notify instead of seeding
+    python run.py -v                 # DEBUG logging
 
-Las fuentes y los filtros están en `config/sources.yaml`.
-Las credenciales de Telegram, en `.env` (local) o como variables de entorno.
+Sources and filters live in `config/sources.yaml`.
+Telegram credentials live in `.env` (local) or as environment variables.
 """
 
 from jobbot.cli import main

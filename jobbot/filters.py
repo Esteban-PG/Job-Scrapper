@@ -1,8 +1,8 @@
 """
-Filtros sobre título y ubicación.
+Filters on title and location.
 
-Los patrones vienen de `config/sources.yaml` y son regex. Regla: si algo matchea
-`exclude`, se descarta aunque también matchee `include`.
+The patterns come from `config/sources.yaml` and are regexes. The rule: if
+something matches `exclude`, it's discarded even if it also matches `include`.
 """
 
 import re

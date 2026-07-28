@@ -5,23 +5,23 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-**Ninguno toca la red ni Telegram.** Se pueden correr sin credenciales, sin
-conexión y sin miedo a mandarte un mensaje: se prueban las funciones puras y la
-base SQLite (siempre contra un archivo temporal, nunca contra
-`data/seen_jobs.db`).
+**None of them touch the network or Telegram.** They can be run without
+credentials, offline and without fear of sending yourself a message: what's
+tested are the pure functions and the SQLite database (always against a
+temporary file, never against `data/seen_jobs.db`).
 
-Eso deja los fetchers fuera de los tests a propósito: lo que hacen es hablar con
-seis sitios que cambian cuando quieren, y un test que dependa de eso falla por
-razones que no son culpa del código. Para saber si una fuente sigue viva está el
-smoke test manual de cada módulo:
+That deliberately leaves the fetchers out of the tests: what they do is talk to
+six sites that change whenever they feel like it, and a test that depends on
+that fails for reasons that aren't the code's fault. To find out whether a
+source is still alive there's the manual smoke test in each module:
 
 ```bash
-python -m jobbot.fetchers.moodys      # o equifax, phenom, workday, amazon
+python -m jobbot.fetchers.radancy      # or equifax, phenom, workday, amazon
 ```
 
-y, en producción, el aviso de fuente caída (`source_health`), que es justamente
-el que cubre ese hueco sin necesidad de un test frágil.
+and, in production, the down-source alert (`source_health`), which is exactly
+what covers that gap without needing a fragile test.
 
-Lo que sí se prueba de los fetchers son sus **funciones puras**: el parseo de
-fechas, el armado de ubicaciones, la traducción de países y el decodificado del
-JWT de Phenom. Ahí es donde están los bugs sutiles, y no necesitan red.
+What is tested about the fetchers is their **pure functions**: date parsing,
+location assembly, country translation and decoding Phenom's JWT. That's where
+the subtle bugs live, and they need no network.

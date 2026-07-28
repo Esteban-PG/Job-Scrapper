@@ -1,13 +1,13 @@
 """
-Bot de alertas de empleo.
+Job alert bot.
 
-Monitorea varias bolsas de trabajo y avisa por Telegram apenas aparece una
-vacante nueva que pase los filtros.
+Monitors several job boards and pings you on Telegram as soon as a new posting
+shows up that passes the filters.
 
-Cuatro piezas desacopladas:
-    fetchers/  una por plataforma; devuelven vacantes ya normalizadas
-    storage    dedupe en SQLite (qué se vio ya)
-    filters    include / exclude / ubicación
+Four decoupled pieces:
+    fetchers/  one per platform; they return already-normalized postings
+    storage    dedupe in SQLite (what has already been seen)
+    filters    include / exclude / location
     notify     Telegram
-    cli        el orquestador que las junta
+    cli        the orchestrator that wires them together
 """

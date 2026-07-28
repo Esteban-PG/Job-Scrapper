@@ -1,42 +1,41 @@
 """
-Plantilla de Phenom People (Phenom CMS) para el bot de alertas.
+Phenom People (Phenom CMS) template for the alert bot.
 
-Phenom multiplexa TODO por POST a `<sitio>/widgets`; lo que cambia es el
-"ddoKey". Las vacantes salen con ddoKey=refineSearch (o alguna variante de
-eagerLoad... en la primera carga). El flujo es siempre el mismo:
+Phenom multiplexes EVERYTHING through a POST to `<site>/widgets`; what changes
+is the "ddoKey". Postings come back with ddoKey=refineSearch (or some
+eagerLoad... variant on the first load). The flow is always the same:
 
-  1. Abrir sesión y visitar una página del sitio para recibir el cookie
-     PLAY_SESSION.
-  2. Sacar el x-csrf-token: viaja DENTRO de ese cookie (es un JWT) y/o plano
-     en el HTML. Se prueban ambos.
-  3. POST de búsqueda paginando con from/size, ya filtrado por país.
+  1. Open a session and visit a page of the site to receive the PLAY_SESSION
+     cookie.
+  2. Pull out the x-csrf-token: it travels INSIDE that cookie (which is a JWT)
+     and/or in plain text in the HTML. Both are tried.
+  3. POST the search, paginating with from/size, already filtered by country.
 
-Como Phenom sirve la MISMA API para cualquier empresa, este módulo está
-parametrizado igual que `workday.py`: los valores propios de cada bolsa
-(`site`, `page_id`, `ref_num`, …) salen de `config/sources.yaml`, no del
-código. `fetch_pg` y `fetch_cisco` son solo presets con esos valores ya
-puestos.
+Since Phenom serves the SAME API for every company, this module is parameterized
+just like `workday.py`: the values specific to each board (`site`, `page_id`,
+`ref_num`, …) come from `config/sources.yaml`, not from the code. `fetch_pg` and
+`fetch_cisco` are just presets with those values already filled in.
 
-De dónde salen los parámetros (DevTools → pestaña Network → POST a /widgets):
-    site        el dominio de la bolsa            https://careers.cisco.com
-    page_id     campo `pageId` del payload        page490-prod
-    page_name   campo `pageName`                  search
-    page_type   campo `pageType`                  search
-    ref_num     campo `refNum` (no todos lo usan) CISCISGLOBAL
-    lang        campo `lang`                      en_global (HPE usa en_us)
-    locale      campo `country` del payload       global    (HPE usa us)
-    extra       cualquier campo extra del payload que ese sitio mande
-                (P&G manda `rk`/`locationData`, Cisco no)
+Where the parameters come from (DevTools → Network tab → POST to /widgets):
+    site        the board's domain                 https://careers.cisco.com
+    page_id     payload's `pageId` field           page490-prod
+    page_name   payload's `pageName` field         search
+    page_type   payload's `pageType` field         search
+    ref_num     payload's `refNum` (not all use it) CISCISGLOBAL
+    lang        payload's `lang` field             en_global (HPE uses en_us)
+    locale      payload's `country` field          global    (HPE uses us)
+    extra       any extra payload field that site happens to send
+                (P&G sends `rk`/`locationData`, Cisco doesn't)
 
-`locale` es el idioma/mercado del SITIO, no el filtro de país: el país de la
-vacante va siempre en `selected_fields.country`.
+`locale` is the SITE's language/market, not the country filter: the posting's
+country always goes in `selected_fields.country`.
 
-`page_name`/`page_type` describen la página desde la que la UI dispara la
-búsqueda; verificado en vivo que NO cambian los resultados (buscar desde la
-categoría "Product and Engineering" o desde el buscador global devuelve lo
-mismo). Lo que filtra de verdad es `selected_fields`.
+`page_name`/`page_type` describe the page the UI fires the search from; verified
+live that they do NOT change the results (searching from the "Product and
+Engineering" category or from the global search box returns the same thing).
+What actually filters is `selected_fields`.
 
-Prueba suelta (imprime lo que encuentra, sin notificar):
+Standalone check (prints what it finds, without notifying):
     python -m jobbot.fetchers.phenom
 """
 
@@ -49,33 +48,33 @@ import requests
 
 from .useragents import BROWSER_UA
 
-PAGE_SIZE = 20       # cuántas por llamada (el default del sitio es 5 o 10)
-MAX_RESULTS = 400    # tope de seguridad
+PAGE_SIZE = 20       # how many per call (the site's default is 5 or 10)
+MAX_RESULTS = 400    # safety cap
 PAGE_PAUSE = 1.5
 
-# Phenom usa una variante de eagerLoad… en la 1a carga y refineSearch después,
-# y el nombre exacto cambia entre versiones (P&G: eagerLoadRefineSearch,
-# Cisco: eagerLoadRefineSearchSession). Se prueban todos en la primera página
-# y nos quedamos con el que traiga vacantes.
+# Phenom uses an eagerLoad… variant on the 1st load and refineSearch afterwards,
+# and the exact name changes between versions (P&G: eagerLoadRefineSearch,
+# Cisco: eagerLoadRefineSearchSession). All of them are tried on the first page
+# and we keep the one that brings back postings.
 DDO_CANDIDATES = ["refineSearch", "eagerLoadRefineSearch",
                   "eagerLoadRefineSearchSession"]
 
 DEFAULT_ALL_FIELDS = ["category", "country", "state", "city", "type"]
 
-# Algunos sitios (Cisco) exponen el token plano en el HTML además de meterlo
-# en el JWT del cookie.
+# Some sites (Cisco) expose the token in plain text in the HTML on top of
+# putting it inside the cookie's JWT.
 CSRF_RE = re.compile(r'csrf[-_]?token["\'\s:=]+([A-Fa-f0-9]{32})', re.I)
 
 
 # --------------------------------------------------------------------------
-# Sesión + token
+# Session + token
 # --------------------------------------------------------------------------
 def _csrf_from_play_session(play_session_cookie):
-    """El PLAY_SESSION es un JWT: header.payload.firma. El csrfToken vive en
-    payload.data.csrfToken. Lo decodificamos sin librerías extra."""
+    """PLAY_SESSION is a JWT: header.payload.signature. The csrfToken lives in
+    payload.data.csrfToken. We decode it without any extra library."""
     try:
         payload_b64 = play_session_cookie.split(".")[1]
-        payload_b64 += "=" * (-len(payload_b64) % 4)      # padding base64
+        payload_b64 += "=" * (-len(payload_b64) % 4)      # base64 padding
         data = json.loads(base64.urlsafe_b64decode(payload_b64))
         return (data.get("data") or {}).get("csrfToken")
     except Exception:
@@ -100,10 +99,10 @@ def _open_session(warmup_url, label):
 
 
 # --------------------------------------------------------------------------
-# Petición de búsqueda
+# Search request
 # --------------------------------------------------------------------------
 def _build_payload(cfg, ddo_key, from_offset):
-    """Payload base común a todo Phenom + los campos propios del sitio."""
+    """Base payload common to all of Phenom + the site's own fields."""
     base = {
         "lang": cfg["lang"], "deviceType": "desktop", "country": cfg["locale"],
         "sortBy": "", "subsearch": "", "keywords": "",
@@ -117,15 +116,15 @@ def _build_payload(cfg, ddo_key, from_offset):
     if cfg["ref_num"]:
         base["refNum"] = cfg["ref_num"]
 
-    # `extra` puede pisar cualquiera de los de arriba (ahí van las rarezas de
-    # cada sitio); los dinámicos van al final para que nadie los pise.
+    # `extra` may override any of the ones above (that's where each site's
+    # quirks go); the dynamic ones go last so nothing can override them.
     return {**base, **cfg["extra"],
             "ddoKey": ddo_key, "from": from_offset, "size": cfg["page_size"]}
 
 
 def _find_jobs_list(obj):
-    """Busca recursivamente una lista bajo la clave 'jobs' (por si la
-    estructura de respuesta cambia entre versiones de Phenom)."""
+    """Recursively looks for a list under the 'jobs' key (in case the response
+    structure changes between Phenom versions)."""
     if isinstance(obj, dict):
         for k, v in obj.items():
             if k == "jobs" and isinstance(v, list):
@@ -142,7 +141,7 @@ def _find_jobs_list(obj):
 
 
 def _extract(resp_json):
-    """Devuelve (jobs, total)."""
+    """Returns (jobs, total)."""
     for key in DDO_CANDIDATES:
         if key in resp_json:
             block = resp_json[key] or {}
@@ -156,17 +155,19 @@ def _extract(resp_json):
 
 
 def _location(j, countries):
-    """La ubicación viene con distinto nombre según el sitio.
+    """The location comes under a different name depending on the site.
 
-    Ojo con las vacantes **multi-ubicación**: los campos de arriba muestran solo
-    la sede principal, que puede estar en otro país. HPE publica puestos con
-    sede en Texas o India que TAMBIÉN se pueden tomar desde Heredia (8 de las 20
-    de Costa Rica son así), y `multi_location` lista las ciudades sin el país
-    ("Heredia, Heredia, 400803"), así que no hay de dónde sacar el nombre.
+    Watch out for **multi-location** postings: the fields above show only the
+    primary site, which may be in another country. HPE publishes roles based in
+    Texas or India that can ALSO be taken from Heredia (8 of the 20 in Costa
+    Rica are like that), and `multi_location` lists the cities without the
+    country ("Heredia, Heredia, 400803"), so there's nowhere to get the name
+    from.
 
-    Como el filtro de país lo aplicó la API, sabemos que el país pedido está
-    entre las ubicaciones aunque no figure en el texto: se anota. Sin esto el
-    filtro de ubicación del bot descartaría vacantes que sí sirven."""
+    Since the country filter was applied by the API, we know the requested
+    country is among the locations even if it isn't in the text: we annotate it.
+    Without this the bot's location filter would discard postings that are
+    actually a good fit."""
     primary = j.get("cityStateCountry") or j.get("location") or ""
     multi = j.get("multi_location") or []
     if not primary:
@@ -175,8 +176,8 @@ def _location(j, countries):
 
     others = len(multi) - 1
     if countries and others > 0 and (j.get("country") or "") not in countries:
-        plural = "ubicación" if others == 1 else "ubicaciones"
-        return f"{primary} (+{others} {plural}, incluye {' o '.join(countries)})"
+        plural = "location" if others == 1 else "locations"
+        return f"{primary} (+{others} {plural}, includes {' or '.join(countries)})"
     return primary
 
 
@@ -204,20 +205,20 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
                  ref_num=None, all_fields=None, page_size=PAGE_SIZE,
                  lang="en_global", locale="global", extra=None):
     """
-    Devuelve las vacantes de una bolsa Phenom, ya normalizadas.
+    Returns the postings of a Phenom board, already normalized.
 
-    site         dominio de la bolsa, sin barra final ("https://careers.cisco.com")
-    page_id      `pageId` del payload; se ve en el POST a /widgets
-    page_name    `pageName` del payload
-    page_type    `pageType` del payload ("search", "category", "landingPage"…)
-    id_prefix    prefijo del id de dedupe ("cisco" -> "cisco-2005253")
-    countries    nombres tal como los muestra el filtro del sitio; None = todos
-    name         nombre legible para la notificación (default: id_prefix)
-    warmup_path  página que se visita para obtener el cookie/token
-    ref_num      `refNum` del payload, si el sitio lo manda
-    all_fields   facets que se piden de vuelta; casi nunca hace falta tocarlo
-    lang/locale  idioma y mercado del SITIO (no el filtro de país)
-    extra        campos extra del payload propios del sitio
+    site         board's domain, no trailing slash ("https://careers.cisco.com")
+    page_id      payload's `pageId`; visible in the POST to /widgets
+    page_name    payload's `pageName`
+    page_type    payload's `pageType` ("search", "category", "landingPage"…)
+    id_prefix    prefix of the dedupe id ("cisco" -> "cisco-2005253")
+    countries    names exactly as the site's filter shows them; None = all
+    name         readable name for the notification (default: id_prefix)
+    warmup_path  page visited to obtain the cookie/token
+    ref_num      payload's `refNum`, if the site sends it
+    all_fields   facets requested back; you almost never need to touch this
+    lang/locale  the SITE's language and market (not the country filter)
+    extra        extra payload fields specific to the site
     """
     label = name or id_prefix
     cfg = {
@@ -259,7 +260,7 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
                 print(f"[warn] {label} {cand} from={from_offset}: {e}")
                 continue
             if jobs:
-                ddo = cand           # nos quedamos con el ddoKey que funcionó
+                ddo = cand           # we keep the ddoKey that worked
                 break
 
         if not jobs:
@@ -278,10 +279,10 @@ def fetch_phenom(site, page_id, page_name, page_type, id_prefix,
 
 
 # --------------------------------------------------------------------------
-# Presets: bolsas Phenom ya verificadas en vivo
+# Presets: Phenom boards already verified live
 # --------------------------------------------------------------------------
 def fetch_pg(countries=("Costa Rica",), name="P&G"):
-    """P&G — https://www.pgcareers.com (verificado: 2 vacantes en Costa Rica)."""
+    """P&G — https://www.pgcareers.com (verified: 2 postings in Costa Rica)."""
     return fetch_phenom(
         site="https://www.pgcareers.com",
         warmup_path="/global/en/locations/costa-rica",
@@ -290,7 +291,7 @@ def fetch_pg(countries=("Costa Rica",), name="P&G"):
         countries=countries, name=name,
         all_fields=["category", "country", "state", "city", "type",
                     "subCategory", "experienceLevel", "phLocSlider"],
-        # P&G manda el bloque del slider de radio y el "rk" de la landing.
+        # P&G sends the radius slider block and the landing page's "rk".
         extra={
             "rk": "l-costa-rica", "ak": "", "irs": False,
             "rkstatus": True, "s": "1", "isSliderEnable": True,
@@ -301,11 +302,11 @@ def fetch_pg(countries=("Costa Rica",), name="P&G"):
 
 
 def fetch_cisco(countries=("Costa Rica",), name="Cisco"):
-    """Cisco — https://careers.cisco.com (verificado: 4 vacantes en Costa Rica).
+    """Cisco — https://careers.cisco.com (verified: 4 postings in Costa Rica).
 
-    El "Aplicar" redirige a Workday (cisco.wd5.myworkdayjobs.com/Cisco_Careers),
-    igual que P&G: si algún día se agrega esa bolsa como `type: workday`, hay
-    que activar una sola de las dos o cada vacante llega duplicada.
+    "Apply" redirects to Workday (cisco.wd5.myworkdayjobs.com/Cisco_Careers),
+    same as P&G: if that board is ever added as `type: workday`, only one of the
+    two can be enabled or every posting arrives twice.
     """
     return fetch_phenom(
         site="https://careers.cisco.com",
@@ -313,21 +314,21 @@ def fetch_cisco(countries=("Costa Rica",), name="Cisco"):
         page_id="page490-prod", page_name="search", page_type="search",
         id_prefix="cisco", ref_num="CISCISGLOBAL",
         countries=countries, name=name,
-        page_size=100,      # verificado: Cisco acepta size=100 sin quejarse
+        page_size=100,      # verified: Cisco accepts size=100 without complaining
         all_fields=["category", "raasJobRequisitionType", "country", "state",
                     "city", "type", "RemoteType"],
     )
 
 
 def fetch_hpe(countries=("Costa Rica",), name="HPE"):
-    """HPE — https://careers.hpe.com (verificado: 20 vacantes en Costa Rica).
+    """HPE — https://careers.hpe.com (verified: 20 postings in Costa Rica).
 
-    Único preset que no corre en `en_global`/`global`: el sitio de HPE es el
-    mercado US (`en_us`/`us`). Eso NO limita las vacantes a Estados Unidos —
-    el país lo sigue filtrando `selected_fields.country`.
+    The only preset that doesn't run on `en_global`/`global`: HPE's site is the
+    US market (`en_us`/`us`). That does NOT limit the postings to the United
+    States — the country is still filtered by `selected_fields.country`.
 
-    "Aplicar" redirige a Workday (hpe.wd5.myworkdayjobs.com/Jobsathpe), igual
-    que P&G y Cisco: activar esta o la de Workday, no las dos.
+    "Apply" redirects to Workday (hpe.wd5.myworkdayjobs.com/Jobsathpe), same as
+    P&G and Cisco: enable this one or the Workday one, not both.
     """
     return fetch_phenom(
         site="https://careers.hpe.com",
@@ -336,7 +337,7 @@ def fetch_hpe(countries=("Costa Rica",), name="HPE"):
         id_prefix="hpe", ref_num="HPE1US",
         lang="en_us", locale="us",
         countries=countries, name=name,
-        page_size=100,      # verificado: HPE acepta size=100
+        page_size=100,      # verified: HPE accepts size=100
         all_fields=["category", "country", "state", "city", "type",
                     "postalCode", "remote"],
     )
@@ -346,7 +347,7 @@ if __name__ == "__main__":
     for fetch in (fetch_pg, fetch_cisco, fetch_hpe):
         jobs = fetch()
         source = jobs[0]["source"] if jobs else fetch.__name__
-        print(f"\n{len(jobs)} vacantes de {source} en Costa Rica:\n")
+        print(f"\n{len(jobs)} {source} postings in Costa Rica:\n")
         for j in jobs:
             loc = j["location"] or "—"
             cat = f" · {j['category']}" if j["category"] else ""

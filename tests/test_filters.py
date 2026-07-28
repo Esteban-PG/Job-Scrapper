@@ -1,13 +1,13 @@
 """
-Filtros de título y ubicación.
+Title and location filters.
 
-La regla que más importa acá es la precedencia: `exclude` gana sobre `include`.
-Sin eso, "Senior Software Engineer" pasaría por tener "software".
+The rule that matters most here is precedence: `exclude` beats `include`.
+Without that, "Senior Software Engineer" would pass for having "software".
 """
 
 from jobbot.filters import compile_filters, matches
 
-FILTROS = compile_filters({
+FILTERS = compile_filters({
     "include": [r"\bjunior\b", r"\bsoftware\b", r"\bqa\b"],
     "exclude": [r"\bsenior\b", r"\bmanager\b"],
     "location_hints": [r"costa rica", r"remote"],
@@ -18,55 +18,55 @@ def job(title, location="Heredia, Costa Rica"):
     return {"title": title, "location": location}
 
 
-def test_pasa_si_matchea_include_y_ubicacion():
-    assert matches(job("Junior Data Analyst"), FILTROS)
+def test_passes_if_it_matches_include_and_location():
+    assert matches(job("Junior Data Analyst"), FILTERS)
 
 
-def test_exclude_gana_sobre_include():
-    """El caso que motiva la regla: matchea 'software' pero también 'senior'."""
-    assert not matches(job("Senior Software Engineer"), FILTROS)
+def test_exclude_beats_include():
+    """The case that motivates the rule: matches 'software' but also 'senior'."""
+    assert not matches(job("Senior Software Engineer"), FILTERS)
 
 
-def test_descarta_si_no_matchea_ningun_include():
-    assert not matches(job("Warehouse Associate"), FILTROS)
+def test_discards_if_it_matches_no_include():
+    assert not matches(job("Warehouse Associate"), FILTERS)
 
 
-def test_descarta_si_la_ubicacion_no_da_pistas():
-    assert not matches(job("Junior Software Engineer", "Bangalore, India"), FILTROS)
+def test_discards_if_the_location_gives_no_hints():
+    assert not matches(job("Junior Software Engineer", "Bangalore, India"), FILTERS)
 
 
-def test_es_insensible_a_mayusculas():
-    assert matches(job("JUNIOR SOFTWARE ENGINEER", "COSTA RICA"), FILTROS)
+def test_is_case_insensitive():
+    assert matches(job("JUNIOR SOFTWARE ENGINEER", "COSTA RICA"), FILTERS)
 
 
-def test_matchea_contra_titulo_y_ubicacion_juntos():
-    """'remote' suele venir en la ubicación, no en el título."""
-    assert matches(job("QA Engineer", "Remote - Americas"), FILTROS)
+def test_matches_against_title_and_location_together():
+    """'remote' usually comes in the location, not in the title."""
+    assert matches(job("QA Engineer", "Remote - Americas"), FILTERS)
 
 
-def test_location_hints_vacio_no_filtra_por_ubicacion():
-    """`location_hints: []` es una elección válida: la fuente ya viene filtrada
-    desde el origen y no hay que exigir nada del texto."""
-    sin_ubicacion = compile_filters({
+def test_empty_location_hints_does_not_filter_by_location():
+    """`location_hints: []` is a valid choice: the source already comes filtered
+    at the origin and there's nothing to demand from the text."""
+    no_location = compile_filters({
         "include": [r"\bsoftware\b"], "exclude": [], "location_hints": [],
     })
-    assert matches(job("Software Engineer", "Bangalore, India"), sin_ubicacion)
+    assert matches(job("Software Engineer", "Bangalore, India"), no_location)
 
 
-def test_include_vacio_deja_pasar_cualquier_titulo():
-    solo_ubicacion = compile_filters({
+def test_empty_include_lets_any_title_through():
+    location_only = compile_filters({
         "include": [], "exclude": [], "location_hints": [r"costa rica"],
     })
-    assert matches(job("Warehouse Associate"), solo_ubicacion)
+    assert matches(job("Warehouse Associate"), location_only)
 
 
-def test_los_limites_de_palabra_evitan_falsos_positivos():
-    """`\\bqa\\b` no debe matchear dentro de otra palabra."""
-    assert not matches(job("Aqua Systems Technician"), FILTROS)
+def test_word_boundaries_avoid_false_positives():
+    """`\\bqa\\b` must not match inside another word."""
+    assert not matches(job("Aqua Systems Technician"), FILTERS)
 
 
-def test_tolera_vacantes_sin_ubicacion():
-    sin_ubicacion = compile_filters({
+def test_tolerates_postings_without_a_location():
+    no_location = compile_filters({
         "include": [r"\bsoftware\b"], "exclude": [], "location_hints": [],
     })
-    assert matches({"title": "Software Engineer"}, sin_ubicacion)
+    assert matches({"title": "Software Engineer"}, no_location)

@@ -1,9 +1,9 @@
 """
-Configuración: credenciales, rutas y `sources.yaml`.
+Configuration: credentials, paths and `sources.yaml`.
 
-Las credenciales salen del entorno o de un `.env` en la raíz del proyecto. Las
-fuentes y los filtros salen de `config/sources.yaml`, para que agregar una bolsa
-sea editar config y no código.
+Credentials come from the environment or from a `.env` at the project root.
+Sources and filters come from `config/sources.yaml`, so that adding a job board
+means editing config and not code.
 """
 
 import logging
@@ -12,17 +12,17 @@ from pathlib import Path
 
 import yaml
 
-# jobbot/config.py -> jobbot/ -> raíz del proyecto
+# jobbot/config.py -> jobbot/ -> project root
 ROOT = Path(__file__).resolve().parents[1]
 
 log = logging.getLogger("jobbot")
 
 
 def _load_env_file(path):
-    """Carga un `.env` sencillo (KEY=VALOR) si existe, para no tener que hacer
-    `export` en cada terminal. No pisa lo que ya esté en el entorno: las
-    variables reales mandan sobre el archivo (así GitHub Actions, que inyecta
-    los secrets como variables, no se ve afectado)."""
+    """Loads a simple `.env` (KEY=VALUE) if it exists, so you don't have to
+    `export` in every terminal. It doesn't override what's already in the
+    environment: real variables win over the file (that way GitHub Actions,
+    which injects the secrets as variables, isn't affected)."""
     if not path.exists():
         return
     for line in path.read_text(encoding="utf-8").splitlines():
@@ -40,15 +40,15 @@ CONFIG_PATH = os.getenv("JOBBOT_SOURCES", str(ROOT / "config" / "sources.yaml"))
 TG_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TG_CHAT = os.getenv("TELEGRAM_CHAT_ID")
 
-SOURCE_PAUSE = 2      # cortesía entre fuentes
-NOTIFY_PAUSE = 0.5    # Telegram tolera ~30 msg/s; vamos muy por debajo
-FAIL_ALERT_AFTER = 2  # corridas seguidas fallando antes de avisar que una fuente se cayó
+SOURCE_PAUSE = 2      # courtesy pause between sources
+NOTIFY_PAUSE = 0.5    # Telegram tolerates ~30 msg/s; we stay well below that
+FAIL_ALERT_AFTER = 2  # consecutive failed runs before alerting that a source is down
 
-# Red de seguridad, NO la configuración real: los filtros que manda son los de
-# `config/sources.yaml`. Estos se usan solo si ese archivo falta o si omite una
-# clave, para que el bot no arranque sin ningún filtro y notifique cualquier
-# cosa. Si editás los filtros, editá la YAML — tocar esto no cambia nada
-# mientras el archivo exista.
+# Safety net, NOT the real configuration: the filters that count are the ones in
+# `config/sources.yaml`. These are used only if that file is missing or omits a
+# key, so the bot doesn't start with no filters at all and notify anything that
+# moves. If you're editing the filters, edit the YAML — touching this changes
+# nothing as long as the file exists.
 DEFAULT_FILTERS = {
     "include": [r"\bjunior\b", r"\bjr\b", r"\bentry.?level\b", r"\bdata\b",
                 r"\bsoftware\b", r"\bqa\b", r"\banalyst\b", r"\bengineer\b"],
@@ -60,10 +60,10 @@ DEFAULT_FILTERS = {
 
 
 def load_config(path):
-    """Lee sources.yaml. Si no existe, corre con los defaults de arriba y sin
-    fuentes (mejor eso que reventar en el cron)."""
+    """Reads sources.yaml. If it doesn't exist, runs with the defaults above and
+    no sources (better that than blowing up in the cron)."""
     if not Path(path).exists():
-        log.warning("no se encontró %s — sin fuentes que revisar", path)
+        log.warning("%s not found — no sources to check", path)
         return [], DEFAULT_FILTERS
 
     with open(path, encoding="utf-8") as fh:
@@ -71,8 +71,8 @@ def load_config(path):
 
     sources = cfg.get("sources") or []
     filters = dict(DEFAULT_FILTERS)
-    # `location_hints: []` es una elección válida (no filtrar por ubicación),
-    # así que se respeta cualquier clave presente, aunque venga vacía.
+    # `location_hints: []` is a valid choice (don't filter by location), so any
+    # key that's present is honored, even if it comes in empty.
     for key, value in (cfg.get("filters") or {}).items():
         if key in filters and value is not None:
             filters[key] = value
@@ -81,5 +81,5 @@ def load_config(path):
 
 
 def source_label(src):
-    """Nombre corto de una fuente, para logs y para el flag --source."""
+    """Short name of a source, for logs and for the --source flag."""
     return src.get("name") or src.get("company") or src.get("tenant") or src["type"]

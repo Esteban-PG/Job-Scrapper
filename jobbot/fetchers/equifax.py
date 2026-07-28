@@ -1,19 +1,19 @@
 """
-Fetcher de vacantes de Equifax para el bot de alertas.
+Equifax posting fetcher for the alert bot.
 
-Equifax publica un feed XML con el catálogo COMPLETO de vacantes:
+Equifax publishes an XML feed with the COMPLETE catalog of postings:
     https://careers.equifax.com/es/trabajos/xml/
 
-Se usa eso en vez de scrapear /es/trabajos/. Razón (verificado en vivo): en esa
-página el filtrado y la paginación son client-side — `?location=`, `?country=` y
-`?page=` los ignora el servidor y devuelve siempre las mismas 20 vacantes. El
-feed, en una sola petición, trae las 140 (12 de Costa Rica) con ubicación y
-categoría ya estructuradas.
+That's used instead of scraping /es/trabajos/. Reason (verified live): on that
+page filtering and pagination are client-side — `?location=`, `?country=` and
+`?page=` are ignored by the server, which always returns the same 20 postings.
+The feed, in a single request, brings all 140 (12 in Costa Rica) with location
+and category already structured.
 
-El `referencenumber` del feed (J00178026) es el mismo código que aparece en la
-URL pública, así que los IDs `efx-J00178026` siguen siendo estables.
+The feed's `referencenumber` (J00178026) is the same code that shows up in the
+public URL, so the `efx-J00178026` IDs stay stable.
 
-Prueba suelta (imprime lo que encuentra, sin notificar):
+Standalone check (prints what it finds, without notifying):
     python -m jobbot.fetchers.equifax
 """
 
@@ -31,7 +31,7 @@ HEADERS = {
     "Accept-Language": "es-ES,es;q=0.9",
 }
 
-TIMEOUT = 60  # el feed pesa ~700 KB
+TIMEOUT = 60  # the feed weighs ~700 KB
 
 
 def _text(job, tag):
@@ -40,8 +40,8 @@ def _text(job, tag):
 
 
 def _iso_date(raw):
-    """'Thu, 12 Feb 2026 00:00:00 GMT' -> '2026-02-12'. Si no parsea, se
-    devuelve crudo: la fecha es opcional en el schema, no vale romper por ella."""
+    """'Thu, 12 Feb 2026 00:00:00 GMT' -> '2026-02-12'. If it doesn't parse, it's
+    returned raw: the date is optional in the schema, not worth breaking over."""
     try:
         return datetime.strptime(raw, "%a, %d %b %Y %H:%M:%S %Z").strftime("%Y-%m-%d")
     except (ValueError, TypeError):
@@ -49,7 +49,7 @@ def _iso_date(raw):
 
 
 def _location(job):
-    """Arma 'Heredia, Costa Rica' con lo que haya, sin comas sueltas."""
+    """Builds 'Heredia, Costa Rica' out of whatever is there, no stray commas."""
     city, state, country = _text(job, "city"), _text(job, "state"), _text(job, "country")
     parts = [city]
     if state and state != city:
@@ -61,10 +61,10 @@ def _location(job):
 
 def fetch_equifax(countries=("Costa Rica",)):
     """
-    Devuelve las vacantes de Equifax de los países dados, ya normalizadas.
+    Returns Equifax's postings for the given countries, already normalized.
 
-    `countries=None` trae el catálogo completo (útil si querés que el filtro de
-    ubicación lo haga solo el orquestador).
+    `countries=None` brings the full catalog (useful if you want the location
+    filtering to be done by the orchestrator alone).
     """
     r = requests.get(FEED_URL, headers=HEADERS, timeout=TIMEOUT)
     r.raise_for_status()
@@ -79,7 +79,7 @@ def fetch_equifax(countries=("Costa Rica",)):
 
         code = _text(job, "referencenumber").upper()
         if not code:
-            continue  # sin código estable no hay dedupe posible
+            continue  # without a stable code there's no dedupe possible
 
         jobs.append({
             "id": f"efx-{code}",
@@ -96,7 +96,7 @@ def fetch_equifax(countries=("Costa Rica",)):
 
 if __name__ == "__main__":
     jobs = fetch_equifax()
-    print(f"\n{len(jobs)} vacantes encontradas:\n")
+    print(f"\n{len(jobs)} postings found:\n")
     for j in jobs:
         cat = f" · {j['category']}" if j["category"] else ""
         print(f"  [{j['id']}] {j['title']}  ({j['location'] or '—'}{cat})")

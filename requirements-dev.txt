@@ -1,4 +1,4 @@
-# Solo para correr los tests. La app en sí no lo necesita: ver requirements.txt.
+# Only for running the tests. The app itself doesn't need it: see requirements.txt.
 -r requirements.txt
 
 pytest>=8.0

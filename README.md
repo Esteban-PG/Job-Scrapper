@@ -1,152 +1,154 @@
-# Bot de alertas de empleo
+# Job alert bot
 
 [![Tests](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/tests.yml/badge.svg)](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/tests.yml)
-[![Alertas de empleo](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml/badge.svg)](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml)
+[![Job alerts](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml/badge.svg)](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-Monitorea varias bolsas de trabajo y avisa por Telegram **apenas aparece una
-vacante nueva** que encaje con el perfil buscado (roles junior de ingeniería de
-software, análisis de datos o QA, en Costa Rica o remoto).
+Monitors several job boards and pings you on Telegram **as soon as a new opening
+shows up** that matches the profile you're after (junior software engineering,
+data analysis or QA roles, in Costa Rica or remote).
 
-La idea es reemplazar varias alertas por correo ruidosas — cada una con su formato,
-su frecuencia y su propio ruido — por **un solo feed filtrado**.
-
-```
-23:15:48  INFO  equifax             11 vacantes ·   3 nuevas ·   2 notificadas
-23:15:51  INFO  pg                   2 vacantes ·   0 nuevas ·   0 notificadas
-23:15:53  INFO  cisco                4 vacantes ·   1 nueva  ·   1 notificada
-23:15:56  INFO  hpe                 20 vacantes ·   2 nuevas ·   1 notificada
-23:15:58  INFO  moodys              22 vacantes ·   3 nuevas ·   2 notificadas
-23:16:00  INFO  amazon               8 vacantes ·   1 nueva  ·   1 notificada
-23:16:00  INFO  total: 67 vacantes · 9 nuevas · 6 notificadas · 6/6 fuentes ok
-```
+The idea is to replace a pile of noisy email alerts — each with its own format,
+its own cadence and its own noise — with **a single filtered feed**.
 
 ```
-🟢 Nueva vacante
+23:15:48 INFO    equifax             11 jobs ·   3 new ·   2 notified
+23:15:51 INFO    pg                   2 jobs ·   0 new ·   0 notified
+23:15:53 INFO    cisco                4 jobs ·   1 new ·   1 notified
+23:15:56 INFO    hpe                 20 jobs ·   2 new ·   1 notified
+23:15:58 INFO    moodys              22 jobs ·   3 new ·   2 notified
+23:16:00 INFO    amazon               8 jobs ·   1 new ·   1 notified
+23:16:00 INFO    total: 67 jobs · 9 new · 6 notified · 6/6 sources ok
+```
+
+```
+🟢 New job posting
 Billing Analyst - Junior
 Heredia, Costa Rica · Accounting · Equifax
 https://careers.equifax.com/es/trabajos/j00178026/billing-analyst-junior/
 ```
 
-## La idea central
+## The core idea
 
-**N bolsas no son N problemas.** Casi ninguna empresa construye su propia
-bolsa de empleo: la subcontrata a un ATS conocido. Al clasificar las fuentes por
-plataforma, todas colapsan a 4-5 plantillas reutilizables, y agregar una empresa
-más pasa a ser una entrada en un YAML.
+**N job boards are not N problems.** Almost no company builds its own job
+board: they outsource it to a well-known ATS. Once you classify the sources by
+platform, they all collapse into 4-5 reusable templates, and adding one more
+company becomes a single YAML entry.
 
-| Plataforma           | Cómo se reconoce                  | Cómo se resuelve              | Estado                                  |
-| -------------------- | --------------------------------- | ----------------------------- | --------------------------------------- |
-| Greenhouse           | `boards.greenhouse.io/<empresa>`  | API JSON pública              | plantilla lista                         |
-| Lever                | `jobs.lever.co/<empresa>`         | API JSON pública              | plantilla lista                         |
-| Ashby                | `jobs.ashbyhq.com/<empresa>`      | API JSON pública              | plantilla lista                         |
-| Workday              | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/`      | ✅ verificada en vivo                   |
-| Phenom               | endpoint `/widgets`               | POST + token CSRF             | ✅ verificada en vivo (P&G, Cisco, HPE) |
-| Equifax              | feed XML propio                   | 1 GET al feed                 | ✅ verificada en vivo                   |
-| Radancy / TalentBrew | assets en `tbcdn.talentbrew.com`  | GET con HTML adentro del JSON | ✅ verificada en vivo (Moody's)         |
-| Amazon               | `amazon.jobs/api/jobs/search`     | 1 POST, sin token             | ✅ verificada en vivo                   |
-| JS pesado sin API    | nada en la pestaña Network        | Playwright                    | último recurso, sin casos aún           |
+| Platform             | How to recognize it               | How it's solved              | Status                                |
+| -------------------- | --------------------------------- | ---------------------------- | ------------------------------------- |
+| Greenhouse           | `boards.greenhouse.io/<company>`  | Public JSON API              | template ready                        |
+| Lever                | `jobs.lever.co/<company>`         | Public JSON API              | template ready                        |
+| Ashby                | `jobs.ashbyhq.com/<company>`      | Public JSON API              | template ready                        |
+| Workday              | `<tenant>.<dc>.myworkdayjobs.com` | JSON POST to `/wday/cxs/`    | ✅ verified live                      |
+| Phenom               | `/widgets` endpoint               | POST + CSRF token            | ✅ verified live (P&G, Cisco, HPE)    |
+| Equifax              | its own XML feed                  | 1 GET to the feed            | ✅ verified live                      |
+| Radancy / TalentBrew | assets on `tbcdn.talentbrew.com`  | GET with HTML inside the JSON | ✅ verified live (Moody's)            |
+| Amazon               | `amazon.jobs/api/jobs/search`     | 1 POST, no token             | ✅ verified live                      |
+| Heavy JS with no API | nothing in the Network tab        | Playwright                   | last resort, no cases yet             |
 
-**LinkedIn e Indeed quedan fuera a propósito.** Bloquean el scraping de forma
-activa y va contra sus términos de servicio. Para esas dos la salida sana son
-sus alertas nativas por correo + una regla en Gmail.
+**LinkedIn and Indeed are deliberately left out.** They actively block scraping
+and it goes against their terms of service. For those two, the sane way out is
+their native email alerts + a Gmail rule.
 
-## Arquitectura
+## Architecture
 
-Cuatro piezas desacopladas, para que agregar una fuente no toque nada más:
+Four decoupled pieces, so that adding a source doesn't touch anything else:
 
 ```
-config/sources.yaml ──> fetchers ──> dedupe (SQLite) ──> filtros ──> Telegram
+config/sources.yaml ──> fetchers ──> dedupe (SQLite) ──> filters ──> Telegram
                            │
-                           └── uno por plataforma; devuelven el mismo schema
+                           └── one per platform; they all return the same schema
 ```
 
-1. **Fetchers** (`jobbot/fetchers/`) — uno por plataforma. No saben nada de
-   filtros ni de notificaciones: solo devuelven vacantes normalizadas.
-2. **Dedupe** — SQLite con los IDs ya vistos. Sin esto el bot repite todo en
-   cada corrida.
-3. **Filtros** — incluir/excluir por título y pista de ubicación.
-4. **Notificación** — Telegram por HTTP.
+1. **Fetchers** (`jobbot/fetchers/`) — one per platform. They know nothing about
+   filters or notifications: they just return normalized job postings.
+2. **Dedupe** — SQLite holding the IDs already seen. Without this the bot
+   repeats everything on every run.
+3. **Filters** — include/exclude by title and location hint.
+4. **Notification** — Telegram over HTTP.
 
-Todos los fetchers devuelven listas de dicts con esta forma. Es el contrato que
-permite que el orquestador no sepa de dónde vino cada vacante:
+Every fetcher returns lists of dicts with this shape. It's the contract that
+lets the orchestrator not care where each posting came from:
 
 ```python
 {
-    "id":       "efx-J00178026",   # único y ESTABLE, con prefijo de fuente
+    "id":       "efx-J00178026",   # unique and STABLE, prefixed by source
     "title":    "Billing Analyst - Junior",
     "location": "Heredia, Costa Rica",
     "url":      "https://...",
     "source":   "Equifax",
-    "category": "Accounting",      # opcional
-    "posted":   "2026-07-20",      # opcional
+    "category": "Accounting",      # optional
+    "posted":   "2026-07-20",      # optional
 }
 ```
 
-El `id` es la clave de deduplicación: sale del código de vacante de la fuente,
-nunca de la posición en la lista ni de un hash del título. Si el sitio reordena
-sus resultados o corrige una palabra del título, el bot no vuelve a avisar.
+The `id` is the dedupe key: it comes from the source's own job code, never from
+the position in the list nor from a hash of the title. If the site reorders its
+results or fixes a word in the title, the bot doesn't notify again.
 
-### Aviso de fuente caída
+### Down-source alerting
 
-Una fuente que se rompe no tumba la corrida: el orquestador la loguea y sigue
-con las demás. El problema es que eso, solo, es invisible — si mañana Moody's
-cambia su API, dejás de recibir vacantes de Moody's y **el silencio se lee igual
-que "no salió nada esta semana"**. Con una sola fuente es tolerable; con quince,
-que alguna se rompa cada tanto es lo esperable.
+A source that breaks doesn't take down the run: the orchestrator logs it and
+carries on with the rest. The problem is that, on its own, that's invisible — if
+Moody's changes its API tomorrow, you stop getting Moody's postings and **the
+silence reads exactly like "nothing came up this week"**. With a single source
+it's tolerable; with fifteen, something breaking every now and then is the
+expected case.
 
-Por eso el bot avisa por Telegram cuando una fuente se cae, y de nuevo cuando
-vuelve. El estado vive en la tabla `source_health` de la misma base:
+That's why the bot pings you on Telegram when a source goes down, and again when
+it comes back. The state lives in the `source_health` table of the same
+database:
 
-- Se avisa recién a la **segunda corrida fallada seguida** (`FAIL_ALERT_AFTER` en
-  `jobbot/config.py`). Un timeout suelto no dispara nada; a `*/30`, dos fallas
-  seguidas ya son treinta minutos caída.
-- Se avisa **una sola vez por caída**, no en cada corrida.
-- Si se caen varias a la vez —lo normal si el que se quedó sin red es el
-  runner— va **un solo mensaje** con todas.
+- It only alerts on the **second consecutive failed run** (`FAIL_ALERT_AFTER` in
+  `jobbot/config.py`). A one-off timeout triggers nothing; at `*/30`, two
+  failures in a row already means thirty minutes down.
+- It alerts **once per outage**, not on every run.
+- If several go down at once — which is what you'd expect if the one that lost
+  network was the runner — it sends **a single message** with all of them.
 
-Es la contraparte del punto de arriba: sirve para que el silencio del bot
-signifique siempre "no hay vacantes nuevas" y nunca "hace tres semanas que estoy
-roto".
+This is the counterpart to the point above: it's what makes the bot's silence
+always mean "no new postings" and never "I've been broken for three weeks".
 
-## Correr local
+## Running locally
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Ver qué encontraría, sin notificar ni tocar la base:
+# See what it would find, without notifying or touching the database:
 python run.py --dry-run
 
-# En serio (necesita las credenciales de Telegram, ver abajo):
-cp .env.example .env    # y completá los dos valores
+# For real (needs the Telegram credentials, see below):
+cp .env.example .env    # and fill in the two values
 python run.py
 ```
 
-Sin `TELEGRAM_TOKEN`/`TELEGRAM_CHAT_ID` el bot no falla: imprime las vacantes por
-consola. Práctico para ajustar filtros.
+Without `TELEGRAM_TOKEN`/`TELEGRAM_CHAT_ID` the bot doesn't fail: it prints the
+postings to the console. Handy for tuning filters.
 
-Flags útiles:
+Useful flags:
 
-| Flag                 | Para qué                                                  |
+| Flag                 | What it's for                                             |
 | -------------------- | --------------------------------------------------------- |
-| `--dry-run`          | Imprime en vez de notificar y no escribe la base          |
-| `--source equifax`   | Corre una sola fuente (por tipo o por nombre)             |
-| `--config otro.yaml` | Usa otro archivo de fuentes                               |
-| `--no-seed`          | Con la base vacía, notifica en vez de sembrar en silencio |
-| `-v`                 | Logging en DEBUG                                          |
+| `--dry-run`          | Prints instead of notifying and doesn't write the database |
+| `--source equifax`   | Runs a single source (by type or by name)                  |
+| `--config other.yaml`| Uses a different sources file                              |
+| `--no-seed`          | With an empty database, notifies instead of seeding silently |
+| `-v`                 | DEBUG logging                                              |
 
-`--no-seed` existe para el arranque: con la base vacía, la corrida normal se
-traga las vacantes que **ya estaban publicadas** (ver _Decisiones de diseño_).
-Si querés recibirlas una vez antes de que la base las dé por vistas, esa primera
-corrida va con `--no-seed`. Con la base ya poblada el flag no cambia nada.
+`--no-seed` exists for the initial start: with an empty database, the normal run
+swallows the postings that were **already published** (see _Design decisions_).
+If you want to receive them once before the database marks them as seen, that
+first run goes with `--no-seed`. Once the database is populated the flag changes
+nothing.
 
-Cada fetcher también corre solo, que es la forma rápida de ver si una fuente
-sigue viva:
+Each fetcher also runs standalone, which is the quick way to check whether a
+source is still alive:
 
 ```bash
 python -m jobbot.fetchers.equifax
-python -m jobbot.fetchers.phenom     # P&G, Cisco y HPE
+python -m jobbot.fetchers.phenom     # P&G, Cisco and HPE
 python -m jobbot.fetchers.workday
 python -m jobbot.fetchers.radancy    # Moody's
 python -m jobbot.fetchers.amazon
@@ -159,50 +161,51 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-73 tests, ~0.15 s, y **ninguno toca la red ni Telegram**: corren sin
-credenciales y sin conexión. Cubren los filtros, la base SQLite (dedupe, umbral
-de avisos y la migración de `source_health`), el formato de los mensajes y las
-funciones puras de los fetchers — el parseo de fechas, el armado de ubicaciones
-y el decodificado del JWT de Phenom.
+73 tests, ~0.15 s, and **none of them touch the network or Telegram**: they run
+without credentials and offline. They cover the filters, the SQLite database
+(dedupe, alert threshold and the `source_health` migration), the message
+formatting and the pure functions of the fetchers — date parsing, location
+assembly and decoding Phenom's JWT.
 
-Los fetchers en sí quedan fuera a propósito: hablan con seis sitios que cambian
-cuando quieren, y un test que dependa de eso falla por razones ajenas al código.
-Ese hueco lo cubre el aviso de fuente caída en producción. Ver
-[tests/README.md](tests/README.md).
+The fetchers themselves are deliberately left out: they talk to six sites that
+change whenever they feel like it, and a test that depends on that fails for
+reasons unrelated to the code. That gap is covered by the down-source alerting
+in production. See [tests/README.md](tests/README.md).
 
-Corren solos en cada push (`.github/workflows/tests.yml`) sobre **Python 3.12 y
-3.14**: la primera es la que usa el bot en producción y la segunda la del
-entorno de desarrollo, así que un cambio que ande en una y no en la otra se ve
-en el momento y no de madrugada en el cron.
+They run on their own on every push (`.github/workflows/tests.yml`) against
+**Python 3.12 and 3.14**: the first is what the bot uses in production and the
+second is the development environment, so a change that works in one and not the
+other shows up right away instead of at 3 a.m. in the cron.
 
-### Configurar Telegram
+### Setting up Telegram
 
-1. Hablale a [@BotFather](https://t.me/BotFather), mandá `/newbot`, elegí nombre
-   y usuario (tiene que terminar en `bot`). Te devuelve el **token**.
-2. Buscá tu bot nuevo por su usuario y **escribile cualquier cosa**. Sin ese
-   primer mensaje tuyo, Telegram no le permite escribirte a vos.
-3. Abrí `https://api.telegram.org/bot<TU_TOKEN>/getUpdates` en el navegador y
-   copiá el número de `result[0].message.chat.id` — ese es el **chat id**.
-4. Poné los dos valores en `.env` (local) y como Secrets en GitHub Actions.
+1. Talk to [@BotFather](https://t.me/BotFather), send `/newbot`, pick a name and
+   a username (it has to end in `bot`). It gives you back the **token**.
+2. Search for your new bot by its username and **send it anything**. Without
+   that first message from you, Telegram won't let it message you.
+3. Open `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates` in the browser and
+   copy the number in `result[0].message.chat.id` — that's the **chat id**.
+4. Put both values in `.env` (local) and as Secrets in GitHub Actions.
 
-El bot lee las credenciales de dos lugares, en este orden:
+The bot reads the credentials from two places, in this order:
 
-| Dónde                | Para qué                    | Se sube al repo          |
-| -------------------- | --------------------------- | ------------------------ |
-| Variables de entorno | Producción / GitHub Actions | no                       |
-| Archivo `.env`       | Comodidad local             | no, está en `.gitignore` |
+| Where                 | What for                    | Committed to the repo      |
+| --------------------- | --------------------------- | -------------------------- |
+| Environment variables | Production / GitHub Actions | no                         |
+| `.env` file           | Local convenience           | no, it's in `.gitignore`   |
 
-Las variables de entorno reales tienen prioridad sobre el `.env`, así que en
-Actions los Secrets mandan aunque el archivo existiera.
+Real environment variables take precedence over `.env`, so in Actions the
+Secrets win even if the file existed.
 
-## Agregar una fuente
+## Adding a source
 
-Se edita `config/sources.yaml`, no el código. Mirá la URL de la bolsa y elegí el tipo:
+You edit `config/sources.yaml`, not the code. Look at the board's URL and pick
+the type:
 
 ```yaml
 sources:
   - type: greenhouse
-    company: nombre-en-la-url # boards.greenhouse.io/nombre-en-la-url
+    company: name-in-the-url # boards.greenhouse.io/name-in-the-url
 
   - type: workday
     tenant: pg # https://pg.wd5.myworkdayjobs.com/1000
@@ -214,35 +217,36 @@ sources:
   - type: equifax
     countries: ["Costa Rica"]
 
-  - type: cisco # preset Phenom, igual que `pg` y `hpe`
+  - type: cisco # Phenom preset, same as `pg` and `hpe`
     countries: ["Costa Rica"]
 
-  - type: moodys # preset Radancy
+  - type: moodys # Radancy preset
     countries: ["Costa Rica"]
 
-  - type: amazon # amazon.jobs; acepta nombre o ISO-2 ("CR")
+  - type: amazon # amazon.jobs; accepts a name or ISO-2 ("CR")
     countries: ["Costa Rica"]
-    categories: # opcional; omitir = las técnicas por defecto
-      - "Software Development" # `categories: []` = todas
+    categories: # optional; omit = the technical ones by default
+      - "Software Development" # `categories: []` = all of them
       - "Operations, IT, & Support Engineering"
 ```
 
-Las bolsas Phenom que ya tienen preset (`pg`, `cisco`, `hpe`) son una línea. Para una
-Phenom nueva va `type: phenom` con los valores que se ven en el POST a
-`/widgets` (`site`, `page_id`, `ref_num`, `id_prefix`); el ejemplo completo está
-comentado en `config/sources.yaml`.
+The Phenom boards that already have a preset (`pg`, `cisco`, `hpe`) are one
+line. For a new Phenom one you use `type: phenom` with the values you can see in
+the POST to `/widgets` (`site`, `page_id`, `ref_num`, `id_prefix`); the full
+example is commented out in `config/sources.yaml`.
 
-En Workday, `countries` va con el **nombre** del país tal como lo muestra el
-filtro del sitio. Internamente Workday no filtra por nombre sino por un ID opaco
-(Costa Rica = `99abe7e6bb3f4c108aebebf01a369ec5` en el tenant de P&G), así que
-el fetcher lee el catálogo de facets que viene en la primera respuesta y traduce
-el nombre solo. Eso evita tener que ir a buscar GUIDs a mano por cada tenant.
+On Workday, `countries` takes the country **name** exactly as the site's filter
+shows it. Internally Workday doesn't filter by name but by an opaque ID (Costa
+Rica = `99abe7e6bb3f4c108aebebf01a369ec5` on P&G's tenant), so the fetcher reads
+the facet catalog that comes in the first response and translates the name on its
+own. That saves you from hunting down GUIDs by hand for every tenant.
 
-Si la bolsa no es de ninguna plataforma conocida, queda `type: html` con un
-selector CSS — y si tampoco hay nada en el HTML, ahí sí toca Playwright.
+If the board doesn't belong to any known platform, it falls back to `type: html`
+with a CSS selector — and if there's nothing in the HTML either, then it's
+Playwright time.
 
-Los filtros también viven en `config/sources.yaml`, así que se pueden afinar sin tocar
-Python:
+The filters also live in `config/sources.yaml`, so they can be tuned without
+touching Python:
 
 ```yaml
 filters:
@@ -251,236 +255,243 @@ filters:
   location_hints: ["remote", "costa rica", "heredia", ...]
 ```
 
-Un título que matchea `exclude` se descarta aunque matchee `include`. Para no
-filtrar por ubicación, `location_hints: []`.
+A title that matches `exclude` is dropped even if it matches `include`. To skip
+filtering by location, use `location_hints: []`.
 
 ## Deploy
 
-### GitHub Actions (incluido)
+### GitHub Actions (included)
 
-`.github/workflows/job-alerts.yml` corre cada 30 minutos en los servidores de
-GitHub — no hace falta dejar la computadora prendida. Solo hay que cargar
-`TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID` en _Settings → Secrets and variables →
-Actions_.
+`.github/workflows/job-alerts.yml` runs every 30 minutes on GitHub's servers —
+no need to leave your computer on. You only have to load `TELEGRAM_TOKEN` and
+`TELEGRAM_CHAT_ID` into _Settings → Secrets and variables → Actions_.
 
-**El detalle que importa:** el runner arranca limpio en cada corrida. Si no se
-persiste `data/seen_jobs.db`, la base sale vacía y el bot cree que es su primera
-corrida, **cada vez**: siembra en silencio y no notifica nada, nunca. La falla no
-avisa — desde el chat se lee igual que "esta semana no salió nada". El workflow lo
-resuelve con `actions/cache`: como las caches de Actions son inmutables, la key
-lleva el `run_id` (siempre distinta) y `restore-keys` recupera la más reciente
-por prefijo.
+**The detail that matters:** the runner starts clean on every run. If
+`data/seen_jobs.db` isn't persisted, the database comes up empty and the bot
+believes it's its first run, **every time**: it seeds silently and never
+notifies anything. The failure is silent — from the chat it reads exactly like
+"nothing came up this week". The workflow solves it with `actions/cache`: since
+Actions caches are immutable, the key carries the `run_id` (always different) and
+`restore-keys` recovers the most recent one by prefix.
 
-Conviene verificarlo a mano una vez, porque es el punto que más fácil se rompe y
-el más silencioso: correr el workflow **dos veces seguidas** y confirmar que la
-segunda dice `0 nuevas`. Si dice `sembrando (sin notificar)`, o si el paso
-*Restaurar base de vistos* dice `Cache not found`, la base no está persistiendo.
+It's worth verifying this by hand once, because it's the point that breaks most
+easily and the quietest one: run the workflow **twice in a row** and confirm the
+second one says `0 new`. If it says `seeding (no notifications)`, or if the
+*Restore seen-jobs database* step says `Cache not found`, the database isn't
+persisting.
 
-Tres advertencias de GitHub Actions que conviene saber:
+Three GitHub Actions caveats worth knowing:
 
-- **Los minutos se cobran en repos privados.** El plan Free da 2000 min/mes y
-  GitHub redondea cada corrida hacia arriba al minuto. A `*/30` son ~1440
-  corridas/mes: entra. A `*/15` serían ~2880 y se pasa. En **repos públicos los
-  minutos son gratis e ilimitados**, así que si el repo es público (como
-  portafolio, conviene) la frecuencia deja de ser un problema.
-- Los cron **no son puntuales, y encima pierden corridas**. No es "se atrasa un
-  poco": bajo carga GitHub descarta el turno en vez de encolarlo. Medido sobre
-  las primeras 34 corridas de este bot con `*/30`, durante 58 horas: **se
-  ejecutó el 29% de lo programado**, con una mediana de 83 min entre corridas,
-  un mínimo de 59 min (nunca llegó a correr cada 30) y picos de casi 4 horas.
-  Por eso el cron está en `7,37 * * * *` y no en `*/30`: `:00` y `:30` son los
-  minutos donde programa todo el mundo y donde la cola es más profunda. Para
-  vacantes de empleo el atraso es irrelevante — nadie llena un puesto en una
-  hora — y el dedupe evita duplicados sin importar cuándo corra.
-- Los workflows programados **se desactivan solos** tras 60 días sin actividad
-  en el repo. Llega con un commit cada tanto, o usar la alternativa de abajo.
+- **Minutes are billed on private repos.** The Free plan gives 2000 min/month
+  and GitHub rounds each run up to the minute. At `*/30` that's ~1440 runs/month:
+  it fits. At `*/15` it'd be ~2880 and you'd go over. On **public repos minutes
+  are free and unlimited**, so if the repo is public (which is a good idea as a
+  portfolio piece) frequency stops being a problem.
+- Cron schedules **aren't punctual, and on top of that they drop runs**. It's not
+  "it's a bit late": under load GitHub discards the slot instead of queueing it.
+  Measured over this bot's first 34 runs with `*/30`, across 58 hours: **it ran
+  29% of what was scheduled**, with a median of 83 min between runs, a minimum of
+  59 min (it never actually ran every 30) and peaks of almost 4 hours. That's why
+  the cron is `7,37 * * * *` and not `*/30`: `:00` and `:30` are the minutes
+  everybody schedules on and where the queue is deepest. For job postings the
+  delay is irrelevant — nobody fills a role in an hour — and the dedupe prevents
+  duplicates no matter when it runs.
+- Scheduled workflows **disable themselves** after 60 days without activity in
+  the repo. A commit every once in a while is enough, or use the alternative
+  below.
 
-Para cambiar la frecuencia se edita una línea del workflow:
+To change the frequency you edit one line of the workflow:
 
 ```yaml
-- cron: "*/30 * * * *" # cada 30 min · "0 * * * *" = cada hora
+- cron: "*/30 * * * *" # every 30 min · "0 * * * *" = hourly
 ```
 
-### VPS con cron
+### VPS with cron
 
 ```cron
-*/30 * * * * cd /ruta/al/bot && /ruta/al/.venv/bin/python run.py >> bot.log 2>&1
+*/30 * * * * cd /path/to/the/bot && /path/to/.venv/bin/python run.py >> bot.log 2>&1
 ```
 
-Acá `data/seen_jobs.db` persiste solo, que es la ventaja principal.
+Here `data/seen_jobs.db` persists on its own, which is the main advantage.
 
-## Decisiones de diseño
+## Design decisions
 
-- **La primera corrida no notifica.** Si la base está vacía, se llena con todo
-  lo que hay pero no se avisa nada; si no, el bot arranca con una avalancha de
-  vacantes viejas. Desde la segunda corrida solo avisa lo nuevo. El costo es que
-  las vacantes ya publicadas no llegan nunca, así que el flag `--no-seed` deja
-  hacer el arranque al revés: notificar esa tanda inicial y sembrar con ella.
-- **Traer todo y filtrar local.** Los fetchers no filtran por palabra clave en
-  el origen (`subsearch` vacío en Phenom, `searchText` vacío en Workday). Cada
-  sitio indexa distinto y una búsqueda por "junior" se come vacantes que sí
-  servían. Se trae todo lo de la ubicación y filtra el bot.
-- **Amazon es la excepción, y filtra por categoría en el origen.** Publica tanto
-  fuera de ingeniería que traer todo son 73 vacantes de Costa Rica para quedarse
-  con 8. La diferencia con filtrar por palabra clave es que la **categoría es un
-  campo estructurado del propio ATS**, no una búsqueda de texto: no se come
-  títulos por cómo estén redactados. Aun así conviene ser generoso con la lista
-  — "Software Development" sola trae 1 vacante, porque Amazon clasifica casi
-  toda la ingeniería bajo "Operations, IT, & Support Engineering".
-- **Una fuente caída no tumba la corrida.** Cada fuente va en su try/except; se
-  loguea el error y sigue con las demás. El proceso solo sale con error si
-  fallaron _todas_.
-- **Si Telegram falla, la vacante no se marca como vista.** Así se reintenta en
-  la próxima corrida en vez de perderse en silencio.
-- **Mensajes en HTML, no Markdown.** Los títulos reales traen `&`, paréntesis y
-  guiones (`FP&A Analyst`, `Support (French, English)`) que rompen el parser
-  Markdown de Telegram y hacen fallar el envío con HTTP 400.
-- **Scraping respetuoso.** Cron cada 30 minutos, `User-Agent` identificable y
-  pausas entre páginas y entre fuentes. Nadie llena una vacante en menos de una
-  hora; bajar la frecuencia solo aumenta el riesgo de bloqueo.
-- **Secretos por variable de entorno.** Nunca en el repo.
+- **The first run doesn't notify.** If the database is empty, it gets filled with
+  everything that's there but nothing is announced; otherwise the bot starts with
+  an avalanche of old postings. From the second run on it only announces what's
+  new. The cost is that already-published postings never arrive, so the
+  `--no-seed` flag lets you do the startup the other way around: notify that
+  initial batch and seed with it.
+- **Fetch everything and filter locally.** The fetchers don't filter by keyword
+  at the source (empty `subsearch` in Phenom, empty `searchText` in Workday).
+  Every site indexes differently and a search for "junior" eats postings that
+  were actually a good fit. It fetches everything for the location and the bot
+  does the filtering.
+- **Amazon is the exception, and filters by category at the source.** It posts so
+  much outside of engineering that fetching everything means 73 Costa Rica
+  postings to end up keeping 8. The difference from filtering by keyword is that
+  the **category is a structured field of the ATS itself**, not a text search: it
+  doesn't eat titles based on how they happen to be worded. Even so it pays to be
+  generous with the list — "Software Development" alone brings 1 posting, because
+  Amazon classifies nearly all of engineering under "Operations, IT, & Support
+  Engineering".
+- **A down source doesn't take down the run.** Each source goes in its own
+  try/except; the error is logged and it moves on to the rest. The process only
+  exits with an error if _all_ of them failed.
+- **If Telegram fails, the posting isn't marked as seen.** That way it's retried
+  on the next run instead of getting lost silently.
+- **Messages in HTML, not Markdown.** Real titles carry `&`, parentheses and
+  dashes (`FP&A Analyst`, `Support (French, English)`) that break Telegram's
+  Markdown parser and make the send fail with HTTP 400.
+- **Respectful scraping.** Cron every 30 minutes, an identifiable `User-Agent`
+  and pauses between pages and between sources. Nobody fills a posting in under
+  an hour; raising the frequency only increases the risk of getting blocked.
+- **Secrets via environment variables.** Never in the repo.
 
-## Notas de ingeniería inversa
+## Reverse engineering notes
 
-Lo que apareció al verificar las fuentes contra los sitios reales:
+What came up while verifying the sources against the real sites:
 
-- **Equifax**: la página pública `/es/trabajos/` acepta `?location=`, `?country=`
-  y `?page=`… y los ignora a todos. El filtrado y la paginación son client-side:
-  el servidor devuelve siempre las mismas 20 vacantes, sin importar los
-  parámetros (verificado: página 1 y página 2 traen exactamente el mismo set).
-  Un scraper sobre ese HTML devolvía 3 vacantes de Costa Rica y parecía correcto.
-  El sitio publica además un feed XML (`/es/trabajos/xml/`) con el catálogo
-  completo: **12 vacantes de Costa Rica en un solo GET**, con ubicación y
-  categoría ya estructuradas, y el mismo código de vacante que usa la URL
-  pública. El fetcher usa el feed.
-- **Workday**: `limit` topa en 20 — pedir 100 devuelve HTTP 400. La paginación
-  va por `offset`. El endpoint CXS respondió igual en tres tenants distintos
-  (`pg`, `intel`, `3m`), que es lo que lo vuelve plantilla y no un caso puntual.
-- **P&G / Phenom**: el `x-csrf-token` no viene en un `<meta>` ni en un header,
-  sino **adentro** del cookie `PLAY_SESSION`, que es un JWT — hay que decodificar
-  el payload y sacar `data.csrfToken`. Si el POST vuelve vacío o con 403, ese es
-  el primer sospechoso. En Cisco el mismo token aparece **también plano en el
-  HTML**; el fetcher prueba el JWT primero y cae al HTML si no está.
-- **Phenom es la misma API para todos**: P&G, Cisco y HPE comparten endpoint,
-  flujo de token y forma de respuesta; lo que cambia son cuatro campos del
-  payload (`pageId`, `pageName`, `pageType`, `refNum`), el idioma/mercado del
-  sitio (HPE corre en `en_us`/`us`, los otros en `en_global`/`global` — no
-  limita las vacantes a EE.UU., el país lo sigue filtrando `selected_fields`) y
-  alguna rareza suelta (P&G manda un bloque `locationData` de slider que los
-  otros no tienen). Por eso el fetcher está parametrizado y cada empresa es un
-  preset de la misma función.
-- **Radancy / Moody's: el filtro de ubicación es todo-o-nada.** Solo se aplica
-  si van los **cinco** parámetros juntos (`Location`, `LocationPath`,
-  `Latitude`, `Longitude`, `LocationType=2`). Con cualquier combinación parcial
-  la API **no falla**: devuelve el catálogo global — 251 vacantes en vez de 22.
-  Probé las cinco combinaciones para confirmarlo. Como `location_hints` incluye
-  "remote", ese fallo silencioso habría metido vacantes remotas de cualquier
-  país, así que el fetcher **revalida localmente** que cada vacante mencione el
-  país y avisa por log si tuvo que descartar algo. Verificado rompiendo el
-  filtro a propósito: devuelve las 22 correctas y loguea el aviso.
-- **Radancy filtra por nodo geográfico**, no por nombre: Costa Rica es
-  `LocationPath=3624060` (GeoNames) más sus coordenadas. Un ID inválido también
-  cae en el catálogo global en silencio, así que los de `COUNTRY_GEO` están
-  verificados uno por uno contra Moody's.
-- **Amazon** no usa un ATS de terceros, tiene el suyo (`sourceSystem:
-JobCreator`), pero la API es la más simple de todas: un POST sin token ni
-  cookies y `size: 100` trae las 73 de Costa Rica de una. Dos trampas: en
-  `searchHits[].fields` **cada valor viene envuelto en una lista de un
-  elemento** (`"title": ["Designer, …"]`), y el campo `urlNextStep` **no sirve
-  de enlace** — apunta a `account.amazon.jobs/…/apply`, que redirige a la
-  pantalla de login. La página pública es `www.amazon.jobs/en/jobs/<icimsJobId>`.
-- **Las categorías de Amazon engañan.** "Software Development" tiene **1**
-  vacante en Costa Rica; los _Incident Management Engineer_ y el _AV Deployment
-  Engineer_ viven en "Operations, IT, & Support Engineering", y los de datos en
-  "Business Intelligence". Un nombre mal escrito no da error: devuelve cero en
-  silencio. Para ver los nombres exactos con su conteo:
+- **Equifax**: the public `/es/trabajos/` page accepts `?location=`, `?country=`
+  and `?page=`… and ignores all of them. Filtering and pagination are
+  client-side: the server always returns the same 20 postings, regardless of the
+  parameters (verified: page 1 and page 2 bring exactly the same set). A scraper
+  over that HTML returned 3 Costa Rica postings and looked correct. The site also
+  publishes an XML feed (`/es/trabajos/xml/`) with the full catalog: **12 Costa
+  Rica postings in a single GET**, with location and category already structured,
+  and the same job code the public URL uses. The fetcher uses the feed.
+- **Workday**: `limit` caps at 20 — asking for 100 returns HTTP 400. Pagination
+  goes through `offset`. The CXS endpoint responded the same on three different
+  tenants (`pg`, `intel`, `3m`), which is what makes it a template and not a
+  one-off case.
+- **P&G / Phenom**: the `x-csrf-token` doesn't come in a `<meta>` or a header,
+  but **inside** the `PLAY_SESSION` cookie, which is a JWT — you have to decode
+  the payload and pull out `data.csrfToken`. If the POST comes back empty or with
+  a 403, that's the first suspect. On Cisco the same token also shows up **in
+  plain text in the HTML**; the fetcher tries the JWT first and falls back to the
+  HTML if it isn't there.
+- **Phenom is the same API for everyone**: P&G, Cisco and HPE share the endpoint,
+  the token flow and the response shape; what changes is four payload fields
+  (`pageId`, `pageName`, `pageType`, `refNum`), the site's language/market (HPE
+  runs on `en_us`/`us`, the others on `en_global`/`global` — this does not limit
+  postings to the US, the country is still filtered by `selected_fields`) and the
+  odd quirk here and there (P&G sends a `locationData` slider block the others
+  don't have). That's why the fetcher is parameterized and each company is a
+  preset of the same function.
+- **Radancy / Moody's: the location filter is all-or-nothing.** It's only applied
+  if **all five** parameters go together (`Location`, `LocationPath`, `Latitude`,
+  `Longitude`, `LocationType=2`). With any partial combination the API **doesn't
+  fail**: it returns the global catalog — 251 postings instead of 22. I tried all
+  five combinations to confirm it. Since `location_hints` includes "remote", that
+  silent failure would have let in remote postings from any country, so the
+  fetcher **revalidates locally** that each posting mentions the country and logs
+  a warning if it had to discard anything. Verified by breaking the filter on
+  purpose: it returns the correct 22 and logs the warning.
+- **Radancy filters by geographic node**, not by name: Costa Rica is
+  `LocationPath=3624060` (GeoNames) plus its coordinates. An invalid ID also
+  falls back to the global catalog silently, so the ones in `COUNTRY_GEO` are
+  verified one by one against Moody's.
+- **Amazon** doesn't use a third-party ATS, it has its own (`sourceSystem:
+JobCreator`), but the API is the simplest of them all: a POST with no token and
+  no cookies, and `size: 100` brings all 73 Costa Rica postings in one shot. Two
+  traps: in `searchHits[].fields` **each value comes wrapped in a single-element
+  list** (`"title": ["Designer, …"]`), and the `urlNextStep` field is **useless
+  as a link** — it points to `account.amazon.jobs/…/apply`, which redirects to
+  the login screen. The public page is
+  `www.amazon.jobs/en/jobs/<icimsJobId>`.
+- **Amazon's categories are misleading.** "Software Development" has **1**
+  posting in Costa Rica; the _Incident Management Engineer_ and the _AV
+  Deployment Engineer_ live under "Operations, IT, & Support Engineering", and
+  the data ones under "Business Intelligence". A misspelled name doesn't error
+  out: it returns zero silently. To see the exact names with their counts:
   `python -m jobbot.fetchers.amazon --categories`.
-- **Amazon filtra por código ISO-2** (`CR`), no por nombre. El fetcher traduce
-  `countries: ["Costa Rica"]` para no romper el contrato del resto de las
-  fuentes, y si el país no está en su tabla lo dice con un error claro en vez de
-  traer el mundo entero. Además `normalizedLocation` termina en el ISO-3
-  (`"Heredia, Heredia, CRI"`), así que la ubicación se rearma con el nombre del
-  país para que `location_hints` tenga contra qué matchear.
-- **Vacantes multi-ubicación (HPE)**: 8 de las 20 de Costa Rica tienen la sede
-  principal en Texas, India o México y Heredia como sede adicional. El filtro de
-  país de la API **sí** las devuelve bien, pero `cityStateCountry` muestra solo
-  la principal, así que el `location_hints` del bot las descartaría. Peor: el
-  array `multi_location` lista las ciudades **sin el país**
-  (`"Heredia, Heredia, 400803"`), o sea que no hay de dónde leer "Costa Rica".
-  Como el filtro lo aplicó la API, el fetcher anota la ubicación como
-  `Spring, Texas, … (+2 ubicaciones, incluye Costa Rica)`.
-- **Cisco**: `pageName`/`pageType` describen desde qué página busca la UI y
-  **no cambian los resultados** (verificado: buscar desde la categoría "Product
-  and Engineering" o desde el buscador global devuelve lo mismo); el filtro real
-  es `selected_fields`. `size` acepta 100 sin quejarse, al revés que Workday. El
-  `x-csrf-token` resultó **opcional**: el endpoint responde 200 sin él, pero se
-  manda igual para replicar al navegador.
-- **P&G aparece en dos plataformas**: la bolsa es Phenom pero el botón "Aplicar"
-  redirige a Workday (`pg.wd5.myworkdayjobs.com`). Ambos fetchers devuelven las
-  mismas 2 vacantes de Costa Rica con IDs distintos (`pg-R000151170` vs
-  `wd-pg-R000151170`), así que hay que activar **una sola**: el dedupe no puede
-  cruzarlas. Cisco (`cisco.wd5/Cisco_Careers`) y HPE (`hpe.wd5/Jobsathpe`) son
-  el mismo caso: si algún día se agregan como `type: workday`, hay que sacar el
-  preset de Phenom correspondiente.
+- **Amazon filters by ISO-2 code** (`CR`), not by name. The fetcher translates
+  `countries: ["Costa Rica"]` so it doesn't break the contract with the rest of
+  the sources, and if the country isn't in its table it says so with a clear
+  error instead of fetching the entire world. On top of that
+  `normalizedLocation` ends in the ISO-3 (`"Heredia, Heredia, CRI"`), so the
+  location is rebuilt with the country name to give `location_hints` something to
+  match against.
+- **Multi-location postings (HPE)**: 8 of the 20 in Costa Rica have their primary
+  site in Texas, India or Mexico and Heredia as an additional site. The API's
+  country filter **does** return them correctly, but `cityStateCountry` only
+  shows the primary one, so the bot's `location_hints` would discard them. Worse:
+  the `multi_location` array lists the cities **without the country**
+  (`"Heredia, Heredia, 400803"`), meaning there's nowhere to read "Costa Rica"
+  from. Since the API already applied the filter, the fetcher records the
+  location as `Spring, Texas, … (+2 locations, includes Costa Rica)`.
+- **Cisco**: `pageName`/`pageType` describe which page the UI is searching from
+  and **don't change the results** (verified: searching from the "Product and
+  Engineering" category or from the global search box returns the same thing);
+  the real filter is `selected_fields`. `size` accepts 100 without complaining,
+  unlike Workday. The `x-csrf-token` turned out to be **optional**: the endpoint
+  responds 200 without it, but it's sent anyway to mirror the browser.
+- **P&G shows up on two platforms**: the board is Phenom but the "Apply" button
+  redirects to Workday (`pg.wd5.myworkdayjobs.com`). Both fetchers return the
+  same 2 Costa Rica postings with different IDs (`pg-R000151170` vs
+  `wd-pg-R000151170`), so you have to enable **only one**: the dedupe can't cross
+  them. Cisco (`cisco.wd5/Cisco_Careers`) and HPE (`hpe.wd5/Jobsathpe`) are the
+  same case: if they're ever added as `type: workday`, the corresponding Phenom
+  preset has to be removed.
 
-### Estado de verificación
+### Verification status
 
-| Fuente                     | Verificado en vivo                                                  |
-| -------------------------- | ------------------------------------------------------------------- |
-| Equifax (feed XML)         | ✅ 11 vacantes en Costa Rica                                        |
-| P&G (Phenom)               | ✅ 2 vacantes en Costa Rica                                         |
-| Cisco (Phenom)             | ✅ 4 vacantes en Costa Rica (de 1023 globales)                      |
-| HPE (Phenom)               | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede       |
-| Moody's (Radancy)          | ✅ 22 vacantes en Costa Rica (de 251 globales)                      |
-| Amazon (ATS propio)        | ✅ 8 vacantes técnicas en Costa Rica (73 sin filtrar por categoría) |
-| Workday (tenant `pg`)      | ✅ 2 vacantes, mismas que Phenom                                    |
-| Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía               |
+| Source                     | Verified live                                                    |
+| -------------------------- | ---------------------------------------------------------------- |
+| Equifax (XML feed)         | ✅ 11 postings in Costa Rica                                     |
+| P&G (Phenom)               | ✅ 2 postings in Costa Rica                                      |
+| Cisco (Phenom)             | ✅ 4 postings in Costa Rica (out of 1023 globally)               |
+| HPE (Phenom)               | ✅ 20 postings in Costa Rica (out of 1061 globally), 8 multi-site |
+| Moody's (Radancy)          | ✅ 22 postings in Costa Rica (out of 251 globally)               |
+| Amazon (own ATS)           | ✅ 8 technical postings in Costa Rica (73 unfiltered by category) |
+| Workday (tenant `pg`)      | ✅ 2 postings, the same ones as Phenom                           |
+| Greenhouse / Lever / Ashby | ⚠️ code ready, no real company configured yet                    |
 
 ## Stack
 
-Python 3, `requests` + `beautifulsoup4` + `PyYAML`. Sin frameworks. SQLite de la
-librería estándar. `pytest` solo para los tests, en `requirements-dev.txt`: la
-app no lo necesita. Playwright queda reservado para si alguna fuente resulta ser
-JS-pesada-sin-API.
+Python 3, `requests` + `beautifulsoup4` + `PyYAML`. No frameworks. SQLite from
+the standard library. `pytest` only for the tests, in `requirements-dev.txt`: the
+app doesn't need it. Playwright is kept in reserve in case some source turns out
+to be heavy-JS-with-no-API.
 
-## Estructura
+## Structure
 
 ```
-run.py                    punto de entrada
+run.py                    entry point
 config/
-  sources.yaml            fuentes y filtros (lo único que se edita a diario)
+  sources.yaml            sources and filters (the only thing edited day to day)
 data/
-  seen_jobs.db            vacantes vistas + salud de las fuentes (no se versiona)
+  seen_jobs.db            seen postings + source health (not versioned)
 jobbot/
-  cli.py                  orquestador: junta las cuatro piezas
-  config.py               .env, rutas y sources.yaml
-  filters.py              include / exclude / ubicación
-  storage.py              dedupe y salud de fuentes, en SQLite
-  notify.py               Telegram (vacantes y avisos de fuente caída)
+  cli.py                  orchestrator: wires the four pieces together
+  config.py               .env, paths and sources.yaml
+  filters.py              include / exclude / location
+  storage.py              dedupe and source health, in SQLite
+  notify.py               Telegram (postings and down-source alerts)
   fetchers/
-    __init__.py           registro: type -> función
-    useragents.py         los dos User-Agent del bot, y por qué son dos
-    ats.py                Greenhouse, Lever y Ashby (API JSON pública)
-    amazon.py             amazon.jobs (POST sin token)
-    equifax.py            feed XML
-    phenom.py             Phenom (POST + CSRF en un JWT) + presets P&G/Cisco/HPE
-    radancy.py            Radancy/TalentBrew (HTML adentro del JSON) + Moody's
-    workday.py            Workday (POST CXS + facets)
-    generic_html.py       último recurso: selector CSS
-tests/                    73 tests, sin red (ver tests/README.md)
+    __init__.py           registry: type -> function
+    useragents.py         the bot's two User-Agents, and why there are two
+    ats.py                Greenhouse, Lever and Ashby (public JSON API)
+    amazon.py             amazon.jobs (POST with no token)
+    equifax.py            XML feed
+    phenom.py             Phenom (POST + CSRF in a JWT) + P&G/Cisco/HPE presets
+    radancy.py            Radancy/TalentBrew (HTML inside the JSON) + Moody's
+    workday.py            Workday (CXS POST + facets)
+    generic_html.py       last resort: CSS selector
+tests/                    73 tests, no network (see tests/README.md)
 .github/workflows/
-  job-alerts.yml          el bot, cada 30 min
-  tests.yml               pytest en cada push (Python 3.12 y 3.14)
-pytest.ini                config de pytest
-requirements-dev.txt      dependencias solo para los tests
+  job-alerts.yml          the bot, every 30 min
+  tests.yml               pytest on every push (Python 3.12 and 3.14)
+pytest.ini                pytest config
+requirements-dev.txt      test-only dependencies
 LICENSE                   MIT
 ```
 
-Las carpetas siguen las cuatro piezas de la arquitectura: cada archivo de
-`jobbot/` es una de ellas, y `fetchers/` crece a medida que se suman
-plataformas. Agregar una bolsa de una plataforma ya soportada **no toca ningún
-archivo `.py`** — solo `config/sources.yaml`.
+The folders follow the four architecture pieces: each file in `jobbot/` is one
+of them, and `fetchers/` grows as platforms are added. Adding a board on an
+already-supported platform **doesn't touch a single `.py` file** — only
+`config/sources.yaml`.
 
-## Licencia
+## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

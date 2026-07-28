@@ -1,28 +1,29 @@
 """
-Plantilla de Workday para el bot de alertas.
+Workday template for the alert bot.
 
-Workday expone una API JSON pública y estable detrás de todas las bolsas
-`*.myworkdayjobs.com`:
+Workday exposes a public, stable JSON API behind every `*.myworkdayjobs.com`
+board:
 
     POST https://<tenant>.<dc>.myworkdayjobs.com/wday/cxs/<tenant>/<site>/jobs
     body: {"appliedFacets": {}, "limit": 20, "offset": 0, "searchText": ""}
 
-Los tres datos que hay que sacar de la URL de la bolsa. Para P&G,
-`https://pg.wd5.myworkdayjobs.com/1000` da: tenant=`pg`, dc=`wd5`, site=`1000`.
+The three values have to be pulled out of the board's URL. For P&G,
+`https://pg.wd5.myworkdayjobs.com/1000` gives: tenant=`pg`, dc=`wd5`, site=`1000`.
 
-Filtro de país sin hardcodear GUIDs
------------------------------------
-Workday filtra por facet, y los facets son IDs opacos
-(Costa Rica = 99abe7e6bb3f4c108aebebf01a369ec5 en P&G). En vez de pegarlos en la
-config, la primera respuesta ya trae el catálogo de facets: se resuelve el
-NOMBRE del país contra ese catálogo y recién ahí se pide la búsqueda filtrada.
-Así la misma plantilla sirve para cualquier tenant sin ir a buscar GUIDs a mano.
+Country filtering without hardcoding GUIDs
+------------------------------------------
+Workday filters by facet, and facets are opaque IDs
+(Costa Rica = 99abe7e6bb3f4c108aebebf01a369ec5 at P&G). Instead of pasting them
+into the config, the first response already carries the facet catalog: the
+country NAME is resolved against that catalog and only then is the filtered
+search requested. That way the same template works for any tenant without
+hunting down GUIDs by hand.
 
-Verificado en vivo contra pg.wd5/1000: `limit` topa en 20 (100 devuelve HTTP
-400), el offset pagina bien, y el facet de país devuelve las mismas 2 vacantes
-de Costa Rica que reporta el fetcher de Phenom.
+Verified live against pg.wd5/1000: `limit` caps at 20 (100 returns HTTP 400),
+the offset paginates correctly, and the country facet returns the same 2 Costa
+Rica postings the Phenom fetcher reports.
 
-Prueba suelta (imprime lo que encuentra, sin notificar):
+Standalone check (prints what it finds, without notifying):
     python -m jobbot.fetchers.workday
 """
 
@@ -32,9 +33,9 @@ import requests
 
 from .useragents import BROWSER_UA
 
-# Workday rechaza limit > 20 con HTTP 400.
+# Workday rejects limit > 20 with HTTP 400.
 PAGE_SIZE = 20
-MAX_RESULTS = 400  # tope de seguridad
+MAX_RESULTS = 400  # safety cap
 PAGE_PAUSE = 1.0
 
 HEADERS = {
@@ -61,28 +62,28 @@ def _search(session, url, applied, offset, search_text):
     })
     r.raise_for_status()
 
-    # Cuando Workday decide que sos un bot NO responde 403: devuelve 200 con una
-    # página HTML. Sin este chequeo el error que se ve es un JSONDecodeError
-    # críptico en vez de la causa real. Si aparece, bajá la frecuencia y esperá:
-    # el bloqueo es temporal.
+    # When Workday decides you're a bot it does NOT respond 403: it returns 200
+    # with an HTML page. Without this check the error you see is a cryptic
+    # JSONDecodeError instead of the real cause. If it shows up, lower the
+    # frequency and wait: the block is temporary.
     if "application/json" not in r.headers.get("content-type", ""):
         raise RuntimeError(
-            f"Workday devolvió {r.headers.get('content-type')} en vez de JSON "
-            f"(probable rate-limit o bloqueo temporal)"
+            f"Workday returned {r.headers.get('content-type')} instead of JSON "
+            f"(probably a rate limit or a temporary block)"
         )
 
     return r.json()
 
 
 def _resolve_country_facets(payload, countries):
-    """Traduce nombres de país -> IDs de facet, leyendo el catálogo que viene
-    en la propia respuesta. Devuelve la lista de IDs encontrados."""
+    """Translates country names -> facet IDs, reading the catalog that comes in
+    the response itself. Returns the list of IDs found."""
     wanted = {c.strip().lower() for c in countries}
     ids = []
 
     for facet in payload.get("facets", []):
-        # Los países cuelgan de un grupo 'locationMainGroup' con subgrupos
-        # (Country / State / City); tomamos el de facetParameter locationCountry.
+        # Countries hang off a 'locationMainGroup' group with subgroups
+        # (Country / State / City); we take the locationCountry facetParameter.
         groups = facet.get("values") or []
         for group in groups:
             if group.get("facetParameter") != "locationCountry":
@@ -99,8 +100,8 @@ def _resolve_country_facets(payload, countries):
 
 
 def _req_id(posting):
-    """El código de vacante (R000154991) viene en bulletFields. Si faltara,
-    caemos al externalPath, que también es estable."""
+    """The job code (R000154991) comes in bulletFields. If it's missing, we fall
+    back to externalPath, which is also stable."""
     bullets = posting.get("bulletFields") or []
     if bullets and bullets[0]:
         return bullets[0]
@@ -110,12 +111,12 @@ def _req_id(posting):
 def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
                   name=None, search_text=""):
     """
-    Devuelve las vacantes de una bolsa Workday, ya normalizadas.
+    Returns the postings of a Workday board, already normalized.
 
-    tenant/site/dc  salen de la URL: https://<tenant>.<dc>.myworkdayjobs.com/<site>
-    countries       nombres tal como los muestra el filtro del sitio; None = todas
-    name            nombre legible para la notificación (default: el tenant)
-    search_text     normalmente vacío: traemos todo y filtramos local
+    tenant/site/dc  come from the URL: https://<tenant>.<dc>.myworkdayjobs.com/<site>
+    countries       names exactly as the site's filter shows them; None = all
+    name            readable name for the notification (default: the tenant)
+    search_text     normally empty: we fetch everything and filter locally
     """
     label = name or tenant
     url = _cxs_url(tenant, site, dc)
@@ -123,7 +124,7 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
 
     session = requests.Session()
 
-    # 1ª llamada sin filtro: sirve para resolver los facets de país.
+    # 1st call with no filter: it's what lets us resolve the country facets.
     first = _search(session, url, {}, 0, search_text)
 
     applied = {}
@@ -132,10 +133,10 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
         if ids:
             applied = {"locationCountry": ids}
         else:
-            print(f"[warn] Workday {label}: no se encontró facet de país para "
-                  f"{list(countries)}; se traen todas y filtra el orquestador")
+            print(f"[warn] Workday {label}: no country facet found for "
+                  f"{list(countries)}; fetching all and letting the orchestrator filter")
 
-    # Si hubo filtro, la primera respuesta ya no sirve: hay que repetir.
+    # If a filter was applied, the first response is no longer usable: repeat it.
     payload = first if not applied else _search(session, url, applied, 0, search_text)
     total = payload.get("total") or 0
 
@@ -162,8 +163,9 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
                 "location": p.get("locationsText", ""),
                 "url": base + path if path else base,
                 "source": label,
-                # Workday da la fecha en relativo ("Posted 14 Days Ago"). Se deja
-                # tal cual: es informativo y `posted` es opcional en el schema.
+                # Workday gives the date as a relative string ("Posted 14 Days
+                # Ago"). It's left as-is: it's informational and `posted` is
+                # optional in the schema.
                 "posted": p.get("postedOn", ""),
             }
 
@@ -175,7 +177,7 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
 if __name__ == "__main__":
     jobs = fetch_workday(tenant="pg", site="1000", dc="wd5",
                          countries=("Costa Rica",), name="P&G (Workday)")
-    print(f"\n{len(jobs)} vacantes encontradas:\n")
+    print(f"\n{len(jobs)} postings found:\n")
     for j in jobs:
         print(f"  [{j['id']}] {j['title']}  ({j['location'] or '—'}) · {j['posted']}")
         print(f"        {j['url']}")

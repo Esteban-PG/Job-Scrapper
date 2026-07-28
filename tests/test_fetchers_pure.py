@@ -1,0 +1,191 @@
+"""
+The pure functions of the fetchers: parsing, normalization and translation.
+
+There's no network here. Every case comes from a real quirk that already cost a
+debugging round and is documented in the corresponding module's docstring.
+"""
+
+import base64
+import json
+from xml.etree import ElementTree as ET
+
+import pytest
+
+from jobbot.fetchers import amazon, equifax, phenom, radancy, workday
+
+
+# --- Amazon ---------------------------------------------------------------
+
+def test_amazon_translates_the_country_name_to_iso2():
+    """The API filters by `CR`, but sources.yaml talks about 'Costa Rica'."""
+    assert amazon._country_code("Costa Rica") == "CR"
+    assert amazon._country_code("costa rica") == "CR"
+    assert amazon._country_code("méxico") == "MX"
+
+
+def test_amazon_accepts_the_code_already_written_out():
+    assert amazon._country_code("CR") == "CR"
+    assert amazon._country_code("cr") == "CR"
+
+
+def test_amazon_explains_the_error_on_an_unknown_country():
+    with pytest.raises(ValueError, match="ISO-2"):
+        amazon._country_code("Wakanda")
+
+
+def test_amazon_unwraps_the_values_in_lists():
+    """In `fields` each value comes wrapped: {"title": ["Designer"]}."""
+    assert amazon._first({"title": ["Designer"]}, "title") == "Designer"
+    assert amazon._first({"title": []}, "title") == ""
+    assert amazon._first({}, "title", "—") == "—"
+    assert amazon._first({"title": "flat"}, "title") == "flat"
+
+
+def test_amazon_does_not_repeat_the_city_when_it_matches_the_state():
+    """'Heredia, Heredia, Costa Rica' reads badly."""
+    fields = {"city": ["Heredia"], "normalizedStateName": ["Heredia"]}
+    assert amazon._location(fields, ["Costa Rica"]) == "Heredia, Costa Rica"
+
+
+def test_amazon_adds_the_country_name_for_the_location_filter():
+    """`normalizedLocation` carries the ISO-3 ('CRI'), which `location_hints`
+    can't match against."""
+    fields = {"city": ["San Jose"], "normalizedStateName": ["San Jose"]}
+    assert "Costa Rica" in amazon._location(fields, ["Costa Rica"])
+
+
+def test_amazon_converts_the_epoch_to_a_date():
+    assert amazon._posted({"createdDate": ["1769472000"]}) == "2026-01-27"
+
+
+def test_amazon_tolerates_an_invalid_date():
+    assert amazon._posted({"createdDate": ["not a date"]}) == ""
+    assert amazon._posted({}) == ""
+
+
+# --- Equifax --------------------------------------------------------------
+
+def test_equifax_converts_the_feed_date_to_iso():
+    assert equifax._iso_date("Thu, 12 Feb 2026 00:00:00 GMT") == "2026-02-12"
+
+
+def test_equifax_returns_the_raw_date_if_it_does_not_parse():
+    """`posted` is optional: not worth breaking the run over an odd date."""
+    assert equifax._iso_date("yesterday") == "yesterday"
+
+
+def test_equifax_builds_the_location_without_stray_commas():
+    job = ET.fromstring(
+        "<job><city>Heredia</city><state></state><country>Costa Rica</country></job>")
+    assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+def test_equifax_does_not_repeat_an_identical_city_and_state():
+    job = ET.fromstring(
+        "<job><city>Heredia</city><state>Heredia</state>"
+        "<country>Costa Rica</country></job>")
+    assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Phenom ---------------------------------------------------------------
+
+def fake_jwt(payload):
+    """PLAY_SESSION is shaped like a JWT: header.payload.signature, and the
+    payload is base64url with no padding."""
+    raw = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    return f"header.{raw.rstrip('=')}.signature"
+
+
+def test_phenom_pulls_the_csrf_from_inside_the_cookie():
+    """The token doesn't travel in a header: it's inside the PLAY_SESSION."""
+    cookie = fake_jwt({"data": {"csrfToken": "abc123"}})
+    assert phenom._csrf_from_play_session(cookie) == "abc123"
+
+
+def test_phenom_returns_none_if_the_cookie_is_no_good():
+    assert phenom._csrf_from_play_session("anything at all") is None
+    assert phenom._csrf_from_play_session(fake_jwt({"data": {}})) is None
+
+
+def test_phenom_annotates_multi_location_postings():
+    """HPE publishes roles based in Texas that can also be taken from Heredia.
+    Without the annotation, `location_hints` would silently discard them."""
+    job = {"cityStateCountry": "Austin, Texas, United States",
+           "country": "United States",
+           "multi_location": ["Austin", "Heredia"]}
+    location = phenom._location(job, ["Costa Rica"])
+    assert "Costa Rica" in location
+    assert "+1 location" in location
+
+
+def test_phenom_does_not_annotate_if_the_primary_site_is_in_the_country():
+    job = {"cityStateCountry": "Heredia, Costa Rica",
+           "country": "Costa Rica",
+           "multi_location": ["Heredia", "San Jose"]}
+    assert phenom._location(job, ["Costa Rica"]) == "Heredia, Costa Rica"
+
+
+def test_phenom_finds_the_postings_even_if_the_structure_changes():
+    """The response changes shape between Phenom versions."""
+    assert phenom._find_jobs_list({"a": {"b": {"jobs": [{"id": 1}]}}}) == [{"id": 1}]
+    assert phenom._find_jobs_list({"nothing": "here"}) == []
+
+
+def test_phenom_uses_the_multi_category_when_there_is_no_simple_one():
+    assert phenom._category({"category": "Engineering"}) == "Engineering"
+    assert phenom._category({"multi_category": ["IT", "Data"]}) == "IT"
+    assert phenom._category({}) == ""
+
+
+# --- Radancy --------------------------------------------------------------
+
+def test_radancy_knows_the_geographic_node_of_costa_rica():
+    geo = radancy._geo("Costa Rica")
+    assert geo["path"] and geo["lat"] and geo["lon"]
+
+
+def test_radancy_fails_clearly_on_a_country_it_does_not_have():
+    """Better an explicit error than sending the request with no location,
+    because the API would return the global catalog without warning."""
+    with pytest.raises(ValueError, match="COUNTRY_GEO"):
+        radancy._geo("Wakanda")
+
+
+def test_radancy_sends_the_five_location_fields_together():
+    """With a partial combination the API doesn't fail: it returns the global
+    catalog. Either all five go or none of them do."""
+    params = radancy._params("49841", "Costa Rica", radancy._geo("Costa Rica"),
+                             1, 50, "")
+    for field in ("Location", "LocationPath", "Latitude", "Longitude", "LocationType"):
+        assert params.get(field) not in (None, "")
+
+
+# --- Workday --------------------------------------------------------------
+
+def test_workday_resolves_the_country_facet_from_the_response():
+    """The IDs are opaque GUIDs and differ on every tenant: they're resolved
+    against the catalog that comes in the response itself."""
+    payload = {"facets": [{"values": [{
+        "facetParameter": "locationCountry",
+        "values": [{"descriptor": "Costa Rica", "id": "99abe7e6"},
+                   {"descriptor": "Mexico", "id": "other"}],
+    }]}]}
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == ["99abe7e6"]
+
+
+def test_workday_finds_no_facet_for_an_absent_country():
+    payload = {"facets": [{"values": [{
+        "facetParameter": "locationCountry",
+        "values": [{"descriptor": "Mexico", "id": "x"}],
+    }]}]}
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == []
+
+
+def test_workday_pulls_the_job_code_from_bulletfields():
+    assert workday._req_id({"bulletFields": ["R000154991"]}) == "R000154991"
+
+
+def test_workday_falls_back_to_externalpath_without_bulletfields():
+    """The fallback also has to give a stable ID."""
+    posting = {"bulletFields": [], "externalPath": "/job/Heredia/Analyst_R000154991"}
+    assert workday._req_id(posting) == "Analyst_R000154991"

@@ -1,12 +1,12 @@
 """
-Los tres ATS con API JSON pública: Greenhouse, Lever y Ashby.
+The three ATSs with a public JSON API: Greenhouse, Lever and Ashby.
 
-Son los casos triviales — una sola llamada GET, sin token ni paginación — y por
-eso viven juntos en un archivo. Si la URL de la bolsa contiene
-`boards.greenhouse.io`, `jobs.lever.co` o `jobs.ashbyhq.com`, es uno de estos.
+They're the trivial cases — a single GET call, no token and no pagination — and
+that's why they live together in one file. If the board's URL contains
+`boards.greenhouse.io`, `jobs.lever.co` or `jobs.ashbyhq.com`, it's one of these.
 
-⚠️ Escritos pero todavía SIN probar en vivo: falta configurar una empresa real.
-Cuando agregues la primera, revisala con `--dry-run` antes de confiar en ella.
+⚠️ Written but NOT yet tested live: no real company configured yet. When you add
+the first one, check it with `--dry-run` before trusting it.
 """
 
 import requests

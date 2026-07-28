@@ -6,9 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Un push nuevo deja obsoleta la corrida anterior. Acá sí conviene cancelarla,
-# al revés que en el workflow de alertas: allá cancelar a mitad podría dejar la
-# base de vistos sin guardar.
+# A new push makes the previous run obsolete. Here it does pay to cancel it,
+# unlike in the alerts workflow: over there, cancelling midway could leave the
+# seen-jobs database unsaved.
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true
@@ -21,9 +21,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.12 es la que corre el bot en producción (ver job-alerts.yml) y 3.14
-        # la del entorno de desarrollo. Probar las dos evita el caso molesto de
-        # que algo ande en la máquina local y se rompa en el cron, o al revés.
+        # 3.12 is what runs the bot in production (see job-alerts.yml) and 3.14
+        # is the development environment. Testing both avoids the annoying case
+        # where something works on the local machine and breaks in the cron, or
+        # the other way around.
         python-version: ["3.12", "3.14"]
 
     steps:
@@ -36,7 +37,7 @@ jobs:
 
       - run: pip install -r requirements-dev.txt
 
-      # Sin secrets a propósito: ningún test sale a la red ni habla con
-      # Telegram. Si alguna vez uno los necesita, es señal de que dejó de ser
-      # un test y pasó a ser una prueba de integración.
+      # No secrets on purpose: no test goes out to the network or talks to
+      # Telegram. If one ever needs them, that's a sign it stopped being a unit
+      # test and became an integration test.
       - run: pytest -q

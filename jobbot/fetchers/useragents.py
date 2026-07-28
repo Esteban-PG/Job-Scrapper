@@ -1,26 +1,27 @@
 """
-Los dos User-Agent del bot, y por qué son dos.
+The bot's two User-Agents, and why there are two.
 
-`BOT_UA` se identifica como lo que es y apunta al repo, que es la forma correcta
-de presentarse: si a alguien le molesta el tráfico, sabe quién es y dónde
-reclamar. Se usa donde la fuente sirve el contenido sin pelear — un feed público
-(Equifax), las APIs abiertas de Greenhouse/Lever/Ashby, o HTML plano.
+`BOT_UA` identifies itself as what it is and points at the repo, which is the
+right way to show up: if the traffic bothers someone, they know who it is and
+where to complain. It's used where the source serves the content without
+fighting — a public feed (Equifax), the open APIs of Greenhouse/Lever/Ashby, or
+plain HTML.
 
-`BROWSER_UA` es una cadena de Chrome. Se usa solo en las cuatro plataformas que
-**rechazan o degradan** una petición que no parezca un navegador: Workday
-responde 200 con una página HTML en vez del JSON, y Phenom, Radancy y Amazon
-sirven la misma API que consume su propio front-end, que siempre manda esta
-cabecera. En esos casos el User-Agent no evade ningún control de acceso: la API
-es pública y no pide credenciales; solo evita un rechazo por heurística.
+`BROWSER_UA` is a Chrome string. It's used only on the four platforms that
+**reject or degrade** a request that doesn't look like a browser: Workday
+responds 200 with an HTML page instead of the JSON, and Phenom, Radancy and
+Amazon serve the same API their own front-end consumes, which always sends this
+header. In those cases the User-Agent doesn't bypass any access control: the API
+is public and asks for no credentials; it only avoids a heuristic rejection.
 
-Ninguno de los dos toca robots.txt ni límites de tasa: eso lo maneja cada
-fetcher con sus pausas entre páginas. LinkedIn e Indeed quedan fuera del bot a
-propósito, porque ahí sí el scraping va contra sus términos.
+Neither of them touches robots.txt or rate limits: each fetcher handles that
+with its own pauses between pages. LinkedIn and Indeed are deliberately left out
+of the bot, because there scraping really does go against their terms.
 """
 
 REPO = "https://github.com/Esteban-PG/Job-alert-bot"
 
-BOT_UA = f"job-alert-bot/1.0 (uso personal; +{REPO})"
+BOT_UA = f"job-alert-bot/1.0 (personal use; +{REPO})"
 
 BROWSER_UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
               "AppleWebKit/537.36 (KHTML, like Gecko) "

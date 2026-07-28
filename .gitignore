@@ -1,11 +1,11 @@
-# Base de vacantes ya vistas: es estado local, no código.
-# En GitHub Actions se persiste con actions/cache (ver .github/workflows/).
+# Database of already-seen postings: it's local state, not code.
+# On GitHub Actions it's persisted with actions/cache (see .github/workflows/).
 data/seen_jobs.db
 
-# Credenciales. La plantilla versionada es .env.example (siempre vacía).
+# Credentials. The versioned template is .env.example (always empty).
 .env
 
-# Notas de trabajo: son para mí, no para quien visita el repo.
+# Working notes: they're for me, not for whoever visits the repo.
 TODO.md
 
 .venv/

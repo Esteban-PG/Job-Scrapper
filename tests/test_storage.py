@@ -1,7 +1,7 @@
 """
-Estado persistente: dedupe (`seen`) y salud de las fuentes (`source_health`).
+Persistent state: dedupe (`seen`) and source health (`source_health`).
 
-Cada test arma su propia base en un archivo temporal, así que nunca tocan
+Each test builds its own database in a temporary file, so they never touch
 `data/seen_jobs.db`.
 """
 
@@ -15,138 +15,138 @@ from jobbot.storage import (already_seen, init_db, is_empty, mark_seen,
 
 @pytest.fixture
 def con(tmp_path):
-    conexion = init_db(tmp_path / "test.db")
-    yield conexion
-    conexion.close()
+    connection = init_db(tmp_path / "test.db")
+    yield connection
+    connection.close()
 
 
 # --- dedupe ---------------------------------------------------------------
 
-def test_base_nueva_esta_vacia(con):
-    """Base vacía es lo que el orquestador lee como 'primera corrida'."""
+def test_a_new_database_is_empty(con):
+    """An empty database is what the orchestrator reads as 'first run'."""
     assert is_empty(con)
 
 
-def test_marcar_una_vacante_la_deja_vista(con):
+def test_marking_a_posting_leaves_it_seen(con):
     assert not already_seen(con, "efx-J001")
     mark_seen(con, ["efx-J001"])
     assert already_seen(con, "efx-J001")
     assert not is_empty(con)
 
 
-def test_marcar_dos_veces_no_rompe(con):
-    """`mark_seen` corre con IDs que pueden ya estar: no debe reventar por la
-    PRIMARY KEY."""
+def test_marking_twice_does_not_break(con):
+    """`mark_seen` runs with IDs that may already be there: it must not blow up
+    on the PRIMARY KEY."""
     mark_seen(con, ["efx-J001", "efx-J002"])
     mark_seen(con, ["efx-J001", "efx-J003"])
     assert con.execute("SELECT COUNT(*) FROM seen").fetchone()[0] == 3
 
 
-def test_marcar_lista_vacia_no_hace_nada(con):
+def test_marking_an_empty_list_does_nothing(con):
     mark_seen(con, [])
     assert is_empty(con)
 
 
-def test_los_ids_no_se_confunden_entre_fuentes(con):
-    """El prefijo de fuente es lo que evita que dos bolsas colisionen."""
+def test_ids_do_not_get_confused_between_sources(con):
+    """The source prefix is what keeps two boards from colliding."""
     mark_seen(con, ["pg-R000151170"])
     assert not already_seen(con, "wd-pg-R000151170")
 
 
-def test_init_db_es_idempotente(tmp_path):
-    """Se llama en cada corrida sobre la misma base."""
-    ruta = tmp_path / "test.db"
-    primera = init_db(ruta)
-    mark_seen(primera, ["efx-J001"])
-    primera.close()
+def test_init_db_is_idempotent(tmp_path):
+    """It's called on every run against the same database."""
+    path = tmp_path / "test.db"
+    first = init_db(path)
+    mark_seen(first, ["efx-J001"])
+    first.close()
 
-    segunda = init_db(ruta)
-    assert already_seen(segunda, "efx-J001")
-    segunda.close()
+    second = init_db(path)
+    assert already_seen(second, "efx-J001")
+    second.close()
 
 
-def test_init_db_agrega_source_health_a_una_base_vieja(tmp_path):
-    """Migración: la caché de Actions guarda bases creadas antes de que
-    existiera `source_health`. La tabla tiene que aparecer sola."""
-    ruta = tmp_path / "vieja.db"
-    vieja = sqlite3.connect(ruta)
-    vieja.execute("CREATE TABLE seen (id TEXT PRIMARY KEY, ts INTEGER)")
-    vieja.execute("INSERT INTO seen VALUES ('efx-J001', 0)")
-    vieja.commit()
-    vieja.close()
+def test_init_db_adds_source_health_to_an_old_database(tmp_path):
+    """Migration: the Actions cache holds databases created before
+    `source_health` existed. The table has to appear on its own."""
+    path = tmp_path / "old.db"
+    old = sqlite3.connect(path)
+    old.execute("CREATE TABLE seen (id TEXT PRIMARY KEY, ts INTEGER)")
+    old.execute("INSERT INTO seen VALUES ('efx-J001', 0)")
+    old.commit()
+    old.close()
 
-    con = init_db(ruta)
-    assert already_seen(con, "efx-J001")          # no se perdió nada
-    assert record_failure(con, "equifax", 1) == (True, 1)   # la tabla existe
+    con = init_db(path)
+    assert already_seen(con, "efx-J001")          # nothing was lost
+    assert record_failure(con, "equifax", 1) == (True, 1)   # the table exists
     con.close()
 
 
-# --- salud de las fuentes -------------------------------------------------
+# --- source health --------------------------------------------------------
 
-def test_la_primera_falla_no_avisa(con):
-    """Un timeout suelto no debe disparar un aviso."""
-    avisar, fallas = record_failure(con, "moodys", 2)
-    assert not avisar
-    assert fallas == 1
+def test_the_first_failure_does_not_alert(con):
+    """A one-off timeout must not fire an alert."""
+    should_alert, fails = record_failure(con, "moodys", 2)
+    assert not should_alert
+    assert fails == 1
 
 
-def test_avisa_al_llegar_al_umbral(con):
+def test_it_alerts_when_it_reaches_the_threshold(con):
     record_failure(con, "moodys", 2)
-    avisar, fallas = record_failure(con, "moodys", 2)
-    assert avisar
-    assert fallas == 2
+    should_alert, fails = record_failure(con, "moodys", 2)
+    assert should_alert
+    assert fails == 2
 
 
-def test_no_repite_el_aviso_mientras_sigue_caida(con):
-    """Lo que evita un mensaje cada 30 minutos durante días."""
+def test_it_does_not_repeat_the_alert_while_still_down(con):
+    """What prevents a message every 30 minutes for days."""
     record_failure(con, "moodys", 2)
-    record_failure(con, "moodys", 2)          # acá avisó
+    record_failure(con, "moodys", 2)          # it alerted here
     for _ in range(5):
-        avisar, _ = record_failure(con, "moodys", 2)
-        assert not avisar
+        should_alert, _ = record_failure(con, "moodys", 2)
+        assert not should_alert
 
 
-def test_umbral_de_uno_avisa_en_la_primera(con):
+def test_a_threshold_of_one_alerts_on_the_first_failure(con):
     assert record_failure(con, "moodys", 1) == (True, 1)
 
 
-def test_las_fuentes_se_cuentan_por_separado(con):
+def test_sources_are_counted_separately(con):
     record_failure(con, "moodys", 2)
-    avisar, fallas = record_failure(con, "hpe", 2)
-    assert not avisar and fallas == 1
+    should_alert, fails = record_failure(con, "hpe", 2)
+    assert not should_alert and fails == 1
 
 
-def test_una_fuente_sana_no_avisa_recuperacion(con):
-    """El caso normal de cada corrida: nunca estuvo caída."""
+def test_a_healthy_source_does_not_alert_a_recovery(con):
+    """The normal case on every run: it was never down."""
     assert record_success(con, "moodys") is None
 
 
-def test_avisa_la_recuperacion_solo_si_habia_avisado_la_caida(con):
+def test_it_alerts_the_recovery_only_if_it_alerted_the_outage(con):
     record_failure(con, "moodys", 2)
-    record_failure(con, "moodys", 2)          # acá avisó
-    caida = record_success(con, "moodys")
-    assert caida is not None and caida >= 0
+    record_failure(con, "moodys", 2)          # it alerted here
+    downtime = record_success(con, "moodys")
+    assert downtime is not None and downtime >= 0
 
 
-def test_una_caida_corta_se_recupera_en_silencio(con):
-    """Falló una vez, no llegó al umbral y volvió: nadie se enteró, y está
-    bien que nadie se entere."""
+def test_a_short_outage_recovers_silently(con):
+    """It failed once, never reached the threshold and came back: nobody found
+    out, and it's right that nobody found out."""
     record_failure(con, "moodys", 2)
     assert record_success(con, "moodys") is None
 
 
-def test_recuperarse_limpia_el_estado(con):
-    """Si no, la próxima caída arrancaría con el contador viejo."""
+def test_recovering_clears_the_state(con):
+    """Otherwise the next outage would start with the old counter."""
     record_failure(con, "moodys", 2)
     record_failure(con, "moodys", 2)
     record_success(con, "moodys")
 
-    avisar, fallas = record_failure(con, "moodys", 2)
-    assert not avisar and fallas == 1
+    should_alert, fails = record_failure(con, "moodys", 2)
+    assert not should_alert and fails == 1
 
 
-def test_la_salud_no_ensucia_el_dedupe(con):
-    """`is_empty` mira solo `seen`: una fuente caída no debe hacer que el bot
-    crea que ya sembró."""
+def test_health_does_not_pollute_the_dedupe(con):
+    """`is_empty` looks only at `seen`: a source being down must not make the
+    bot think it has already seeded."""
     record_failure(con, "moodys", 2)
     assert is_empty(con)
