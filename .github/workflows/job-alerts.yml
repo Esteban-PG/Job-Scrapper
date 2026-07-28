@@ -24,9 +24,9 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -49,7 +49,7 @@ jobs:
       # se guarde aunque el bot termine en error.
       # ---------------------------------------------------------------
       - name: Restaurar base de vistos
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: data/seen_jobs.db
           key: seen-jobs-${{ github.run_id }}
@@ -64,7 +64,7 @@ jobs:
 
       - name: Guardar base de vistos
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: data/seen_jobs.db
           key: seen-jobs-${{ github.run_id }}
