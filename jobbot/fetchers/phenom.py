@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Plantilla de Phenom People (Phenom CMS) para el bot de alertas.
 
@@ -48,6 +47,8 @@ import time
 
 import requests
 
+from .useragents import BROWSER_UA
+
 PAGE_SIZE = 20       # cuántas por llamada (el default del sitio es 5 o 10)
 MAX_RESULTS = 400    # tope de seguridad
 PAGE_PAUSE = 1.5
@@ -64,9 +65,6 @@ DEFAULT_ALL_FIELDS = ["category", "country", "state", "city", "type"]
 # Algunos sitios (Cisco) exponen el token plano en el HTML además de meterlo
 # en el JWT del cookie.
 CSRF_RE = re.compile(r'csrf[-_]?token["\'\s:=]+([A-Fa-f0-9]{32})', re.I)
-
-UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
 
 
 # --------------------------------------------------------------------------
@@ -86,7 +84,7 @@ def _csrf_from_play_session(play_session_cookie):
 
 def _open_session(warmup_url, label):
     s = requests.Session()
-    s.headers.update({"User-Agent": UA, "Accept-Language": "en;q=0.9"})
+    s.headers.update({"User-Agent": BROWSER_UA, "Accept-Language": "en;q=0.9"})
     token = None
     try:
         r = s.get(warmup_url, timeout=20)
@@ -344,9 +342,6 @@ def fetch_hpe(countries=("Costa Rica",), name="HPE"):
     )
 
 
-# --------------------------------------------------------------------------
-# Prueba directa
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     for fetch in (fetch_pg, fetch_cisco, fetch_hpe):
         jobs = fetch()

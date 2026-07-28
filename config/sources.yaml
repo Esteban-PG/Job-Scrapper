@@ -80,7 +80,7 @@ sources:
   # usan las técnicas por defecto (CATEGORIES_TECH en jobbot/fetchers/amazon.py).
   # `categories: []` trae TODAS y deja que filtre el bot por título.
   # Los nombres tienen que ser exactos; para verlos:
-  #     python -m jobbot.fetchers.amazon --categorias
+  #     python -m jobbot.fetchers.amazon --categories
   - type: amazon
     countries: ["Costa Rica"]
     categories:

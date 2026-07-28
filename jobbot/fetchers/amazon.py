@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Fetcher de amazon.jobs para el bot de alertas.
 
@@ -12,7 +11,7 @@ lo expone en una sola llamada JSON, sin token ni cookies:
 Respuesta: `{found, start, facets, searchHits: [{fields: {...}}]}`. Ojo con la
 forma de `fields`: **cada valor es una lista de un elemento**
 (`{"title": ["Designer, …"], "city": ["Heredia"]}`), no un string. Por eso todo
-pasa por `_one()` antes de usarse.
+pasa por `_first()` antes de usarse.
 
 Es la única fuente que **filtra por categoría en el origen**, al revés que el
 resto (ver "Decisiones de diseño" en el README). El motivo: Amazon publica mucho
@@ -31,18 +30,19 @@ Tres detalles que ya costaron una vuelta y conviene no volver a descubrir:
   La página pública es `www.amazon.jobs/en/jobs/<icimsJobId>` (redirige sola al
   slug con el título).
 - Un nombre de categoría mal escrito **no da error**: devuelve cero vacantes en
-  silencio. Por eso conviene sacarlos de `--categorias` y no de memoria.
+  silencio. Por eso conviene sacarlos de `--categories` y no de memoria.
 
 Prueba suelta (imprime lo que encuentra, sin notificar):
     python -m jobbot.fetchers.amazon
-    python -m jobbot.fetchers.amazon --categorias   # qué categorías hay
+    python -m jobbot.fetchers.amazon --categories   # qué categorías hay
 """
 
-import json
 import time
 from datetime import datetime, timezone
 
 import requests
+
+from .useragents import BROWSER_UA
 
 SEARCH_URL = "https://www.amazon.jobs/api/jobs/search?is_als=true"
 JOB_URL = "https://www.amazon.jobs/en/jobs/{}"
@@ -71,7 +71,7 @@ COUNTRY_CODES = {
 # Categorías técnicas de Amazon, con el nombre EXACTO del facet (si se escribe
 # distinto, el filtro no falla: devuelve cero). Verificadas contra el facet
 # `category` de Costa Rica. Para ver las que hay en un país:
-#     python -m jobbot.fetchers.amazon --categorias
+#     python -m jobbot.fetchers.amazon --categories
 CATEGORIES_TECH = [
     "Software Development",
     "Operations, IT, & Support Engineering",
@@ -79,11 +79,8 @@ CATEGORIES_TECH = [
     "Solutions Architect",
 ]
 
-UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
-
 HEADERS = {
-    "User-Agent": UA,
+    "User-Agent": BROWSER_UA,
     "Accept": "application/json",
     "Content-Type": "application/json",
     "Origin": "https://www.amazon.jobs",
@@ -139,7 +136,7 @@ def _payload(codes, query, start, size, categories=()):
     }
 
 
-def _one(fields, key, default=""):
+def _first(fields, key, default=""):
     """En `fields` cada valor viene envuelto en una lista de un elemento."""
     value = fields.get(key)
     if isinstance(value, list):
@@ -149,7 +146,7 @@ def _one(fields, key, default=""):
 
 def _posted(fields):
     """createdDate es un epoch en segundos, como string."""
-    raw = _one(fields, "createdDate")
+    raw = _first(fields, "createdDate")
     try:
         return datetime.fromtimestamp(int(raw), timezone.utc).strftime("%Y-%m-%d")
     except (TypeError, ValueError):
@@ -160,27 +157,27 @@ def _location(fields, country_names):
     """`normalizedLocation` viene como "Heredia, Heredia, CRI" — con el ISO-3,
     no con el nombre del país. Se rearma con el nombre para que el filtro de
     ubicación del bot (`location_hints`) tenga contra qué matchear."""
-    city = _one(fields, "city") or _one(fields, "normalizedCityName")
-    state = _one(fields, "normalizedStateName")
+    city = _first(fields, "city") or _first(fields, "normalizedCityName")
+    state = _first(fields, "normalizedStateName")
     parts = [p for p in (city, state) if p]
     # Se dedupe "Heredia, Heredia" -> "Heredia".
     if len(parts) == 2 and parts[0] == parts[1]:
         parts = parts[:1]
     parts += country_names
-    return ", ".join(parts) or _one(fields, "normalizedLocation")
+    return ", ".join(parts) or _first(fields, "normalizedLocation")
 
 
-def _map_job(hit, country_names):
+def _map_job(hit, country_names, label):
     fields = hit.get("fields") or {}
-    job_id = _one(fields, "icimsJobId")
+    job_id = _first(fields, "icimsJobId")
     return {
         "id": f"amz-{job_id}",
-        "title": _one(fields, "title"),
+        "title": _first(fields, "title"),
         "location": _location(fields, country_names),
-        "category": _one(fields, "category"),
+        "category": _first(fields, "category"),
         "posted": _posted(fields),
         "url": JOB_URL.format(job_id) if job_id else "",
-        "source": "Amazon",
+        "source": label,
     }
 
 
@@ -220,7 +217,7 @@ def fetch_amazon(countries=("Costa Rica",), name="Amazon", query="",
             found = payload.get("found") or 0
 
         for hit in hits:
-            m = _map_job(hit, country_names)
+            m = _map_job(hit, country_names, name)
             if m["id"] != "amz-":
                 by_id[m["id"]] = m
 
@@ -232,13 +229,10 @@ def fetch_amazon(countries=("Costa Rica",), name="Amazon", query="",
     return list(by_id.values())
 
 
-# --------------------------------------------------------------------------
-# Prueba directa
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys
 
-    if "--categorias" in sys.argv:
+    if "--categories" in sys.argv:
         # Para elegir qué poner en `categories`: lista las categorías que
         # Amazon tiene abiertas en el país, con su conteo y el nombre exacto.
         session = requests.Session()

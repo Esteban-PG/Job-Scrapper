@@ -35,6 +35,7 @@ FETCHERS = {
     "equifax": lambda s: fetch_equifax(countries=s.get("countries", ["Costa Rica"])),
     "amazon": lambda s: fetch_amazon(
         countries=s.get("countries", ["Costa Rica"]),
+        name=s.get("name", "Amazon"),
         query=s.get("query", ""),
         # `categories` ausente = las técnicas por defecto; `categories: []` =
         # todas (son dos cosas distintas, por eso no se usa s.get(k, default)).

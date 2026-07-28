@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Fetcher de vacantes de Equifax para el bot de alertas.
 
@@ -23,10 +22,12 @@ from datetime import datetime
 
 import requests
 
+from .useragents import BOT_UA
+
 FEED_URL = "https://careers.equifax.com/es/trabajos/xml/"
 
 HEADERS = {
-    "User-Agent": "job-alert-bot/1.0 (uso personal; contacto@ejemplo.com)",
+    "User-Agent": BOT_UA,
     "Accept-Language": "es-ES,es;q=0.9",
 }
 
@@ -93,9 +94,6 @@ def fetch_equifax(countries=("Costa Rica",)):
     return jobs
 
 
-# --------------------------------------------------------------------------
-# Prueba directa
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     jobs = fetch_equifax()
     print(f"\n{len(jobs)} vacantes encontradas:\n")

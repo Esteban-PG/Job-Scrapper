@@ -44,12 +44,18 @@ SOURCE_PAUSE = 2      # cortesía entre fuentes
 NOTIFY_PAUSE = 0.5    # Telegram tolera ~30 msg/s; vamos muy por debajo
 FAIL_ALERT_AFTER = 2  # corridas seguidas fallando antes de avisar que una fuente se cayó
 
+# Red de seguridad, NO la configuración real: los filtros que manda son los de
+# `config/sources.yaml`. Estos se usan solo si ese archivo falta o si omite una
+# clave, para que el bot no arranque sin ningún filtro y notifique cualquier
+# cosa. Si editás los filtros, editá la YAML — tocar esto no cambia nada
+# mientras el archivo exista.
 DEFAULT_FILTERS = {
     "include": [r"\bjunior\b", r"\bjr\b", r"\bentry.?level\b", r"\bdata\b",
                 r"\bsoftware\b", r"\bqa\b", r"\banalyst\b", r"\bengineer\b"],
     "exclude": [r"\bsenior\b", r"\bstaff\b", r"\bprincipal\b", r"\blead\b",
-                r"\bmanager\b", r"\bdirector\b"],
-    "location_hints": [r"remote", r"latam", r"americas", r"costa rica", r"anywhere"],
+                r"\bmanager\b", r"\bdirector\b", r"\bsr\.?\b", r"\bhead of\b"],
+    "location_hints": [r"remote", r"remoto", r"latam", r"americas",
+                       r"costa rica", r"anywhere", r"heredia", r"san jos[eé]"],
 }
 
 

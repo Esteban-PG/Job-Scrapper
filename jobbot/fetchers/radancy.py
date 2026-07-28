@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Plantilla de Radancy / TalentBrew para el bot de alertas.
 
@@ -38,6 +37,8 @@ import time
 import requests
 from bs4 import BeautifulSoup
 
+from .useragents import BROWSER_UA
+
 # Verificado: RecordsPerPage=50 trae las 22 de Costa Rica en una sola llamada.
 PAGE_SIZE = 50
 MAX_PAGES = 20        # tope de seguridad
@@ -59,11 +60,8 @@ COUNTRY_GEO = {
     "brazil": {"path": "3469034", "lat": "-10.00000", "lon": "-55.00000"},
 }
 
-UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
-
 HEADERS = {
-    "User-Agent": UA,
+    "User-Agent": BROWSER_UA,
     "Accept": "application/json",
     "X-Requested-With": "XMLHttpRequest",
 }
@@ -172,7 +170,7 @@ def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
     session.headers.update(HEADERS)
 
     by_id = {}
-    leaked = 0
+    discarded = 0
 
     for country in countries:
         geo = _geo(country)
@@ -194,7 +192,7 @@ def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
                 # Revalidación: si el filtro del servidor se cayó, esto evita
                 # notificar vacantes de medio mundo (ver docstring).
                 if needle not in job["location"].lower():
-                    leaked += 1
+                    discarded += 1
                     continue
                 by_id[job["id"]] = job
 
@@ -203,8 +201,8 @@ def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
             page += 1
             time.sleep(PAGE_PAUSE)
 
-    if leaked:
-        print(f"[warn] {label}: {leaked} vacantes descartadas por no ser de "
+    if discarded:
+        print(f"[warn] {label}: {discarded} vacantes descartadas por no ser de "
               f"{list(countries)} — el filtro de ubicación del servidor no está "
               f"aplicando; revisar los parámetros Location*/Latitude/Longitude")
 
@@ -220,9 +218,6 @@ def fetch_moodys(countries=("Costa Rica",), name="Moody's"):
                          countries=countries, name=name)
 
 
-# --------------------------------------------------------------------------
-# Prueba directa
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     jobs = fetch_moodys()
     print(f"\n{len(jobs)} vacantes de Moody's en Costa Rica:\n")

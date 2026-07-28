@@ -11,5 +11,3 @@ Cuatro piezas desacopladas:
     notify     Telegram
     cli        el orquestador que las junta
 """
-
-__version__ = "1.0.0"

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Plantilla de Workday para el bot de alertas.
 
@@ -31,16 +30,15 @@ import time
 
 import requests
 
+from .useragents import BROWSER_UA
+
 # Workday rechaza limit > 20 con HTTP 400.
 PAGE_SIZE = 20
 MAX_RESULTS = 400  # tope de seguridad
 PAGE_PAUSE = 1.0
 
-UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-      "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36")
-
 HEADERS = {
-    "User-Agent": UA,
+    "User-Agent": BROWSER_UA,
     "Accept": "application/json",
     "Content-Type": "application/json",
 }
@@ -174,9 +172,6 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
     return list(by_id.values())
 
 
-# --------------------------------------------------------------------------
-# Prueba directa
-# --------------------------------------------------------------------------
 if __name__ == "__main__":
     jobs = fetch_workday(tenant="pg", site="1000", dc="wd5",
                          countries=("Costa Rica",), name="P&G (Workday)")

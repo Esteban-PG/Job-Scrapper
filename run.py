@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Punto de entrada del bot de alertas de empleo.
 

@@ -42,28 +42,22 @@ Falta: subirlo, activarlo, y cargarle las otras 9 bolsas.
   vacía notifica en vez de sembrar en silencio. Con la base ya poblada no hace
   nada, así que es inofensivo dejarlo puesto.
 
-### 1.2 Repo git
+### 1.2 Repo git — hecho
 
-- [ ] Decidir **público o privado**. No es solo preferencia: en repos privados
-      GitHub cobra los minutos de Actions (2000/mes gratis; a `*/30` son ~1440,
-      entra justo). **En repos públicos los minutos son gratis e ilimitados**, y
-      además este proyecto sirve de portafolio. Recomendado: **público**.
-- [ ] Antes del primer commit, confirmar que **no se sube ningún secreto**:
+- [x] Repo **público** en https://github.com/Esteban-PG/Job-Scrapper (en repos
+      públicos los minutos de Actions son gratis e ilimitados; en privados el
+      plan Free da 2000/mes y a `*/30` son ~1440, que entra pero justo).
+- [x] Auditado que no se filtró ningún secreto: `.env` **nunca** se commiteó,
+      `.env.example` está con los campos vacíos, y no aparece ningún patrón de
+      token de Telegram en toda la historia del repo.
+- [x] Licencia MIT (`LICENSE`). Sin licencia, un repo público es legalmente
+      "todos los derechos reservados" y nadie puede usar el código.
 
-```bash
-git init
-git add -A
-git status --short          # revisar que NO aparezca .env
-git check-ignore -v .env    # tiene que decir que .gitignore lo ignora
-```
-
-- [ ] Verificar que `.env.example` sigue con los campos **vacíos** (es plantilla y
-      sí se sube; las credenciales van en `.env`, que no se sube).
-- [ ] Primer commit y push:
+Si algún día hace falta reauditar los secretos:
 
 ```bash
-git commit -m "Bot de alertas de empleo: orquestador, 3 fetchers y deploy"
-gh repo create job-alert-bot --public --source=. --push
+git check-ignore -v .env       # tiene que decir que .gitignore lo ignora
+git log --all --oneline -- .env    # vacío = nunca se commiteó
 ```
 
 ### 1.3 Activar GitHub Actions
@@ -215,7 +209,7 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
   Development" sola trae 1** — casi toda la ingeniería está en "Operations, IT,
   & Support Engineering", y los roles de datos en "Business Intelligence". Un
   nombre mal escrito devuelve cero **sin dar error**; sacalos de
-  `python -m jobbot.fetchers.amazon --categorias`, que los lista con su conteo.
+  `python -m jobbot.fetchers.amazon --categories`, que los lista con su conteo.
 - **Radancy (Moody's)**: el filtro de ubicación es **todo-o-nada**. Van juntos
   `Location` + `LocationPath` + `Latitude` + `Longitude` + `LocationType=2`, o
   la API devuelve el **catálogo global sin avisar** (251 vacantes en vez de 22).
@@ -235,7 +229,7 @@ source .venv/bin/activate
 python run.py --dry-run             # qué notificaría, sin mandar nada
 python run.py --source equifax      # una sola fuente
 python run.py -v                    # logging DEBUG
-python jobbot/fetchers/equifax.py   # probar un fetcher aislado
+python -m jobbot.fetchers.equifax   # probar un fetcher aislado
 
 # Empezar de cero (¡vuelve a sembrar y no notifica esa corrida!)
 rm data/seen_jobs.db

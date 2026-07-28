@@ -9,7 +9,9 @@ JSON, y eso siempre es más estable que un selector CSS.
 import requests
 from bs4 import BeautifulSoup
 
-HEADERS = {"User-Agent": "job-alert-bot/1.0 (personal use; contacto@ejemplo.com)"}
+from .useragents import BOT_UA
+
+HEADERS = {"User-Agent": BOT_UA}
 
 
 def fetch_html(src):

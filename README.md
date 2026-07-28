@@ -4,7 +4,7 @@ Monitorea varias bolsas de trabajo y avisa por Telegram **apenas aparece una
 vacante nueva** que encaje con el perfil buscado (roles junior de ingeniería de
 software, análisis de datos o QA, en Costa Rica o remoto).
 
-La idea es reemplazar 15 alertas por correo ruidosas — cada una con su formato,
+La idea es reemplazar varias alertas por correo ruidosas — cada una con su formato,
 su frecuencia y su propio ruido — por **un solo feed filtrado**.
 
 ```
@@ -26,22 +26,22 @@ https://careers.equifax.com/es/trabajos/j00178026/billing-analyst-junior/
 
 ## La idea central
 
-**15 bolsas no son 15 problemas.** Casi ninguna empresa construye su propia
+**N bolsas no son N problemas.** Casi ninguna empresa construye su propia
 bolsa de empleo: la subcontrata a un ATS conocido. Al clasificar las fuentes por
-plataforma, las 15 colapsan a 4-5 plantillas reutilizables, y agregar la empresa
-número 16 pasa a ser una entrada en un YAML.
+plataforma, todas colapsan a 4-5 plantillas reutilizables, y agregar una empresa
+más pasa a ser una entrada en un YAML.
 
-| Plataforma | Cómo se reconoce | Cómo se resuelve | Estado |
-|---|---|---|---|
-| Greenhouse | `boards.greenhouse.io/<empresa>` | API JSON pública | plantilla lista |
-| Lever | `jobs.lever.co/<empresa>` | API JSON pública | plantilla lista |
-| Ashby | `jobs.ashbyhq.com/<empresa>` | API JSON pública | plantilla lista |
-| Workday | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/` | ✅ verificada en vivo |
-| Phenom | endpoint `/widgets` | POST + token CSRF | ✅ verificada en vivo (P&G, Cisco, HPE) |
-| Equifax | feed XML propio | 1 GET al feed | ✅ verificada en vivo |
-| Radancy / TalentBrew | assets en `tbcdn.talentbrew.com` | GET con HTML adentro del JSON | ✅ verificada en vivo (Moody's) |
-| Amazon | `amazon.jobs/api/jobs/search` | 1 POST, sin token | ✅ verificada en vivo |
-| JS pesado sin API | nada en la pestaña Network | Playwright | último recurso, sin casos aún |
+| Plataforma           | Cómo se reconoce                  | Cómo se resuelve              | Estado                                  |
+| -------------------- | --------------------------------- | ----------------------------- | --------------------------------------- |
+| Greenhouse           | `boards.greenhouse.io/<empresa>`  | API JSON pública              | plantilla lista                         |
+| Lever                | `jobs.lever.co/<empresa>`         | API JSON pública              | plantilla lista                         |
+| Ashby                | `jobs.ashbyhq.com/<empresa>`      | API JSON pública              | plantilla lista                         |
+| Workday              | `<tenant>.<dc>.myworkdayjobs.com` | POST JSON a `/wday/cxs/`      | ✅ verificada en vivo                   |
+| Phenom               | endpoint `/widgets`               | POST + token CSRF             | ✅ verificada en vivo (P&G, Cisco, HPE) |
+| Equifax              | feed XML propio                   | 1 GET al feed                 | ✅ verificada en vivo                   |
+| Radancy / TalentBrew | assets en `tbcdn.talentbrew.com`  | GET con HTML adentro del JSON | ✅ verificada en vivo (Moody's)         |
+| Amazon               | `amazon.jobs/api/jobs/search`     | 1 POST, sin token             | ✅ verificada en vivo                   |
+| JS pesado sin API    | nada en la pestaña Network        | Playwright                    | último recurso, sin casos aún           |
 
 **LinkedIn e Indeed quedan fuera a propósito.** Bloquean el scraping de forma
 activa y va contra sus términos de servicio. Para esas dos la salida sana son
@@ -124,16 +124,16 @@ consola. Práctico para ajustar filtros.
 
 Flags útiles:
 
-| Flag | Para qué |
-|---|---|
-| `--dry-run` | Imprime en vez de notificar y no escribe la base |
-| `--source equifax` | Corre una sola fuente (por tipo o por nombre) |
-| `--config otro.yaml` | Usa otro archivo de fuentes |
-| `--no-seed` | Con la base vacía, notifica en vez de sembrar en silencio |
-| `-v` | Logging en DEBUG |
+| Flag                 | Para qué                                                  |
+| -------------------- | --------------------------------------------------------- |
+| `--dry-run`          | Imprime en vez de notificar y no escribe la base          |
+| `--source equifax`   | Corre una sola fuente (por tipo o por nombre)             |
+| `--config otro.yaml` | Usa otro archivo de fuentes                               |
+| `--no-seed`          | Con la base vacía, notifica en vez de sembrar en silencio |
+| `-v`                 | Logging en DEBUG                                          |
 
 `--no-seed` existe para el arranque: con la base vacía, la corrida normal se
-traga las vacantes que **ya estaban publicadas** (ver *Decisiones de diseño*).
+traga las vacantes que **ya estaban publicadas** (ver _Decisiones de diseño_).
 Si querés recibirlas una vez antes de que la base las dé por vistas, esa primera
 corrida va con `--no-seed`. Con la base ya poblada el flag no cambia nada.
 
@@ -141,11 +141,11 @@ Cada fetcher también corre solo, que es la forma rápida de ver si una fuente
 sigue viva:
 
 ```bash
-python jobbot/fetchers/equifax.py
-python jobbot/fetchers/phenom.py    # P&G, Cisco y HPE
-python jobbot/fetchers/workday.py
-python jobbot/fetchers/radancy.py   # Moody's
-python jobbot/fetchers/amazon.py
+python -m jobbot.fetchers.equifax
+python -m jobbot.fetchers.phenom     # P&G, Cisco y HPE
+python -m jobbot.fetchers.workday
+python -m jobbot.fetchers.radancy    # Moody's
+python -m jobbot.fetchers.amazon
 ```
 
 ### Configurar Telegram
@@ -160,10 +160,10 @@ python jobbot/fetchers/amazon.py
 
 El bot lee las credenciales de dos lugares, en este orden:
 
-| Dónde | Para qué | Se sube al repo |
-|---|---|---|
-| Variables de entorno | Producción / GitHub Actions | no |
-| Archivo `.env` | Comodidad local | no, está en `.gitignore` |
+| Dónde                | Para qué                    | Se sube al repo          |
+| -------------------- | --------------------------- | ------------------------ |
+| Variables de entorno | Producción / GitHub Actions | no                       |
+| Archivo `.env`       | Comodidad local             | no, está en `.gitignore` |
 
 Las variables de entorno reales tienen prioridad sobre el `.env`, así que en
 Actions los Secrets mandan aunque el archivo existiera.
@@ -175,10 +175,10 @@ Se edita `config/sources.yaml`, no el código. Mirá la URL de la bolsa y elegí
 ```yaml
 sources:
   - type: greenhouse
-    company: nombre-en-la-url      # boards.greenhouse.io/nombre-en-la-url
+    company: nombre-en-la-url # boards.greenhouse.io/nombre-en-la-url
 
   - type: workday
-    tenant: pg                     # https://pg.wd5.myworkdayjobs.com/1000
+    tenant: pg # https://pg.wd5.myworkdayjobs.com/1000
     dc: wd5
     site: "1000"
     countries: ["Costa Rica"]
@@ -187,16 +187,16 @@ sources:
   - type: equifax
     countries: ["Costa Rica"]
 
-  - type: cisco                    # preset Phenom, igual que `pg` y `hpe`
+  - type: cisco # preset Phenom, igual que `pg` y `hpe`
     countries: ["Costa Rica"]
 
-  - type: moodys                   # preset Radancy
+  - type: moodys # preset Radancy
     countries: ["Costa Rica"]
 
-  - type: amazon                   # amazon.jobs; acepta nombre o ISO-2 ("CR")
+  - type: amazon # amazon.jobs; acepta nombre o ISO-2 ("CR")
     countries: ["Costa Rica"]
-    categories:                    # opcional; omitir = las técnicas por defecto
-      - "Software Development"     # `categories: []` = todas
+    categories: # opcional; omitir = las técnicas por defecto
+      - "Software Development" # `categories: []` = todas
       - "Operations, IT, & Support Engineering"
 ```
 
@@ -221,7 +221,7 @@ Python:
 filters:
   include: ['\bjunior\b', '\bdata\b', '\bqa\b', ...]
   exclude: ['\bsenior\b', '\bmanager\b', ...]
-  location_hints: ['remote', 'costa rica', 'heredia', ...]
+  location_hints: ["remote", "costa rica", "heredia", ...]
 ```
 
 Un título que matchea `exclude` se descarta aunque matchee `include`. Para no
@@ -233,8 +233,8 @@ filtrar por ubicación, `location_hints: []`.
 
 `.github/workflows/job-alerts.yml` corre cada 30 minutos en los servidores de
 GitHub — no hace falta dejar la computadora prendida. Solo hay que cargar
-`TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID` en *Settings → Secrets and variables →
-Actions*.
+`TELEGRAM_TOKEN` y `TELEGRAM_CHAT_ID` en _Settings → Secrets and variables →
+Actions_.
 
 **El detalle que importa:** el runner arranca limpio en cada corrida. Si no se
 persiste `data/seen_jobs.db`, la base sale vacía y el bot cree que es su primera
@@ -260,7 +260,7 @@ Tres advertencias de GitHub Actions que conviene saber:
 Para cambiar la frecuencia se edita una línea del workflow:
 
 ```yaml
-- cron: "*/30 * * * *"    # cada 30 min · "0 * * * *" = cada hora
+- cron: "*/30 * * * *" # cada 30 min · "0 * * * *" = cada hora
 ```
 
 ### VPS con cron
@@ -291,7 +291,7 @@ Acá `data/seen_jobs.db` persiste solo, que es la ventaja principal.
   toda la ingeniería bajo "Operations, IT, & Support Engineering".
 - **Una fuente caída no tumba la corrida.** Cada fuente va en su try/except; se
   loguea el error y sigue con las demás. El proceso solo sale con error si
-  fallaron *todas*.
+  fallaron _todas_.
 - **Si Telegram falla, la vacante no se marca como vista.** Así se reintenta en
   la próxima corrida en vez de perderse en silencio.
 - **Mensajes en HTML, no Markdown.** Los títulos reales traen `&`, paréntesis y
@@ -345,18 +345,18 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
   cae en el catálogo global en silencio, así que los de `COUNTRY_GEO` están
   verificados uno por uno contra Moody's.
 - **Amazon** no usa un ATS de terceros, tiene el suyo (`sourceSystem:
-  JobCreator`), pero la API es la más simple de todas: un POST sin token ni
+JobCreator`), pero la API es la más simple de todas: un POST sin token ni
   cookies y `size: 100` trae las 73 de Costa Rica de una. Dos trampas: en
   `searchHits[].fields` **cada valor viene envuelto en una lista de un
   elemento** (`"title": ["Designer, …"]`), y el campo `urlNextStep` **no sirve
   de enlace** — apunta a `account.amazon.jobs/…/apply`, que redirige a la
   pantalla de login. La página pública es `www.amazon.jobs/en/jobs/<icimsJobId>`.
 - **Las categorías de Amazon engañan.** "Software Development" tiene **1**
-  vacante en Costa Rica; los *Incident Management Engineer* y el *AV Deployment
-  Engineer* viven en "Operations, IT, & Support Engineering", y los de datos en
+  vacante en Costa Rica; los _Incident Management Engineer_ y el _AV Deployment
+  Engineer_ viven en "Operations, IT, & Support Engineering", y los de datos en
   "Business Intelligence". Un nombre mal escrito no da error: devuelve cero en
   silencio. Para ver los nombres exactos con su conteo:
-  `python -m jobbot.fetchers.amazon --categorias`.
+  `python -m jobbot.fetchers.amazon --categories`.
 - **Amazon filtra por código ISO-2** (`CR`), no por nombre. El fetcher traduce
   `countries: ["Costa Rica"]` para no romper el contrato del resto de las
   fuentes, y si el país no está en su tabla lo dice con un error claro en vez de
@@ -387,16 +387,16 @@ Lo que apareció al verificar las fuentes contra los sitios reales:
 
 ### Estado de verificación
 
-| Fuente | Verificado en vivo |
-|---|---|
-| Equifax (feed XML) | ✅ 11 vacantes en Costa Rica |
-| P&G (Phenom) | ✅ 2 vacantes en Costa Rica |
-| Cisco (Phenom) | ✅ 4 vacantes en Costa Rica (de 1023 globales) |
-| HPE (Phenom) | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede |
-| Moody's (Radancy) | ✅ 22 vacantes en Costa Rica (de 251 globales) |
-| Amazon (ATS propio) | ✅ 8 vacantes técnicas en Costa Rica (73 sin filtrar por categoría) |
-| Workday (tenant `pg`) | ✅ 2 vacantes, mismas que Phenom |
-| Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía |
+| Fuente                     | Verificado en vivo                                                  |
+| -------------------------- | ------------------------------------------------------------------- |
+| Equifax (feed XML)         | ✅ 11 vacantes en Costa Rica                                        |
+| P&G (Phenom)               | ✅ 2 vacantes en Costa Rica                                         |
+| Cisco (Phenom)             | ✅ 4 vacantes en Costa Rica (de 1023 globales)                      |
+| HPE (Phenom)               | ✅ 20 vacantes en Costa Rica (de 1061 globales), 8 multi-sede       |
+| Moody's (Radancy)          | ✅ 22 vacantes en Costa Rica (de 251 globales)                      |
+| Amazon (ATS propio)        | ✅ 8 vacantes técnicas en Costa Rica (73 sin filtrar por categoría) |
+| Workday (tenant `pg`)      | ✅ 2 vacantes, mismas que Phenom                                    |
+| Greenhouse / Lever / Ashby | ⚠️ código listo, sin empresa real configurada todavía               |
 
 ## Stack
 
@@ -420,6 +420,7 @@ jobbot/
   notify.py               Telegram (vacantes y avisos de fuente caída)
   fetchers/
     __init__.py           registro: type -> función
+    useragents.py         los dos User-Agent del bot, y por qué son dos
     ats.py                Greenhouse, Lever y Ashby (API JSON pública)
     amazon.py             amazon.jobs (POST sin token)
     equifax.py            feed XML
@@ -428,9 +429,14 @@ jobbot/
     workday.py            Workday (POST CXS + facets)
     generic_html.py       último recurso: selector CSS
 .github/workflows/job-alerts.yml
+LICENSE                   MIT
 ```
 
 Las carpetas siguen las cuatro piezas de la arquitectura: cada archivo de
 `jobbot/` es una de ellas, y `fetchers/` crece a medida que se suman
 plataformas. Agregar una bolsa de una plataforma ya soportada **no toca ningún
 archivo `.py`** — solo `config/sources.yaml`.
+
+## Licencia
+
+MIT — ver [LICENSE](LICENSE).
