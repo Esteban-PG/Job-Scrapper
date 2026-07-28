@@ -252,8 +252,15 @@ Tres advertencias de GitHub Actions que conviene saber:
   corridas/mes: entra. A `*/15` serían ~2880 y se pasa. En **repos públicos los
   minutos son gratis e ilimitados**, así que si el repo es público (como
   portafolio, conviene) la frecuencia deja de ser un problema.
-- Los cron **no son puntuales**: bajo carga se atrasan y a veces saltan una
-  corrida. Para vacantes de empleo es irrelevante.
+- Los cron **no son puntuales, y encima pierden corridas**. No es "se atrasa un
+  poco": bajo carga GitHub descarta el turno en vez de encolarlo. Medido sobre
+  las primeras 34 corridas de este bot con `*/30`, durante 58 horas: **se
+  ejecutó el 29% de lo programado**, con una mediana de 83 min entre corridas,
+  un mínimo de 59 min (nunca llegó a correr cada 30) y picos de casi 4 horas.
+  Por eso el cron está en `7,37 * * * *` y no en `*/30`: `:00` y `:30` son los
+  minutos donde programa todo el mundo y donde la cola es más profunda. Para
+  vacantes de empleo el atraso es irrelevante — nadie llena un puesto en una
+  hora — y el dedupe evita duplicados sin importar cuándo corra.
 - Los workflows programados **se desactivan solos** tras 60 días sin actividad
   en el repo. Llega con un commit cada tanto, o usar la alternativa de abajo.
 

@@ -217,6 +217,14 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
   localmente y loguea `[warn] … vacantes descartadas` si eso pasa: **si ves ese
   aviso, el filtro del servidor se rompió**, no es ruido. No "simplificar"
   mandando solo `Location`.
+- **Cron de GitHub Actions**: no es puntual y **descarta** corridas bajo carga
+  (no las encola). Medido con `*/30` sobre 58 horas: corrió el **29%** de lo
+  programado, mediana de 83 min, mínimo 59 min, pico de 3.9 h. Los peores huecos
+  cayeron entre 01:00 y 15:00 UTC. Por eso el cron pasó a `7,37 * * * *`: `:00`
+  y `:30` son los minutos más congestionados de la plataforma. No hay forma de
+  arreglarlo del todo desde el workflow; si alguna vez hiciera falta puntualidad
+  real, sería con un disparador externo al `workflow_dispatch`, que es más
+  infraestructura de la que esto amerita.
 - **Telegram**: los mensajes van en **HTML, no Markdown**. Títulos reales como
   `FP&A Analyst` o `Support (French, English)` rompen el parser Markdown y el
   envío falla con HTTP 400.

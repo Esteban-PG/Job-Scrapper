@@ -2,14 +2,21 @@ name: Alertas de empleo
 
 on:
   schedule:
-    # Cada 30 minutos = ~1440 corridas/mes. GitHub cobra por minuto redondeado
-    # hacia arriba, y el plan Free da 2000 min/mes en repos privados: a este
-    # ritmo entra, a */15 se pasaría. En repo público no se cobra nada.
+    # Cada 30 minutos, pero en :07 y :37 y NO en :00/:30, que es donde programa
+    # todo el mundo y donde la cola de GitHub es más profunda.
     #
-    # GitHub tampoco garantiza puntualidad en los cron (bajo carga se atrasa y
-    # a veces saltea una corrida); acá da igual, nadie llena una vacante en
-    # media hora.
-    - cron: "*/30 * * * *"
+    # Los cron de Actions son best-effort: bajo carga GitHub atrasa la corrida
+    # y, si el atraso se come el turno siguiente, la **descarta** (no la encola
+    # ni la recupera). Medido sobre las primeras 34 corridas con `*/30`: se
+    # ejecutó el 29% de lo programado, mediana de 83 min entre corridas, mínimo
+    # 59 min (nunca llegó a correr cada 30) y picos de casi 4 h. Correr en
+    # minutos impares es la única palanca gratis que existe contra esto.
+    #
+    # Para vacantes de empleo el atraso da igual, y el dedupe evita duplicados
+    # sin importar cuándo corra. Frecuencia y costo: ~1440 corridas/mes, que en
+    # repo privado entrarían justo en los 2000 min/mes del plan Free; en repo
+    # público (este) los minutos son gratis e ilimitados.
+    - cron: "7,37 * * * *"
   workflow_dispatch:        # botón "Run workflow" para probar a mano
 
 # Dos corridas en paralelo se pisarían la base de vistos y podrían notificar
