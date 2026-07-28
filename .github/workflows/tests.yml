@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Un push nuevo deja obsoleta la corrida anterior. Acá sí conviene cancelarla,
+# al revés que en el workflow de alertas: allá cancelar a mitad podría dejar la
+# base de vistos sin guardar.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.12 es la que corre el bot en producción (ver job-alerts.yml) y 3.14
+        # la del entorno de desarrollo. Probar las dos evita el caso molesto de
+        # que algo ande en la máquina local y se rompa en el cron, o al revés.
+        python-version: ["3.12", "3.14"]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - run: pip install -r requirements-dev.txt
+
+      # Sin secrets a propósito: ningún test sale a la red ni habla con
+      # Telegram. Si alguna vez uno los necesita, es señal de que dejó de ser
+      # un test y pasó a ser una prueba de integración.
+      - run: pytest -q

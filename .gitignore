@@ -8,4 +8,5 @@ data/seen_jobs.db
 .venv/
 __pycache__/
 *.pyc
+.pytest_cache/
 .DS_Store

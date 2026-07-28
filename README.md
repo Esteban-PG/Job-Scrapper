@@ -1,5 +1,9 @@
 # Bot de alertas de empleo
 
+[![Tests](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/tests.yml/badge.svg)](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/tests.yml)
+[![Alertas de empleo](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/job-alerts.yml/badge.svg)](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/job-alerts.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
 Monitorea varias bolsas de trabajo y avisa por Telegram **apenas aparece una
 vacante nueva** que encaje con el perfil buscado (roles junior de ingeniería de
 software, análisis de datos o QA, en Costa Rica o remoto).
@@ -147,6 +151,29 @@ python -m jobbot.fetchers.workday
 python -m jobbot.fetchers.radancy    # Moody's
 python -m jobbot.fetchers.amazon
 ```
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+73 tests, ~0.15 s, y **ninguno toca la red ni Telegram**: corren sin
+credenciales y sin conexión. Cubren los filtros, la base SQLite (dedupe, umbral
+de avisos y la migración de `source_health`), el formato de los mensajes y las
+funciones puras de los fetchers — el parseo de fechas, el armado de ubicaciones
+y el decodificado del JWT de Phenom.
+
+Los fetchers en sí quedan fuera a propósito: hablan con seis sitios que cambian
+cuando quieren, y un test que dependa de eso falla por razones ajenas al código.
+Ese hueco lo cubre el aviso de fuente caída en producción. Ver
+[tests/README.md](tests/README.md).
+
+Corren solos en cada push (`.github/workflows/tests.yml`) sobre **Python 3.12 y
+3.14**: la primera es la que usa el bot en producción y la segunda la del
+entorno de desarrollo, así que un cambio que ande en una y no en la otra se ve
+en el momento y no de madrugada en el cron.
 
 ### Configurar Telegram
 
@@ -408,7 +435,8 @@ JobCreator`), pero la API es la más simple de todas: un POST sin token ni
 ## Stack
 
 Python 3, `requests` + `beautifulsoup4` + `PyYAML`. Sin frameworks. SQLite de la
-librería estándar. Playwright queda reservado para si alguna fuente resulta ser
+librería estándar. `pytest` solo para los tests, en `requirements-dev.txt`: la
+app no lo necesita. Playwright queda reservado para si alguna fuente resulta ser
 JS-pesada-sin-API.
 
 ## Estructura
@@ -435,7 +463,12 @@ jobbot/
     radancy.py            Radancy/TalentBrew (HTML adentro del JSON) + Moody's
     workday.py            Workday (POST CXS + facets)
     generic_html.py       último recurso: selector CSS
-.github/workflows/job-alerts.yml
+tests/                    73 tests, sin red (ver tests/README.md)
+.github/workflows/
+  job-alerts.yml          el bot, cada 30 min
+  tests.yml               pytest en cada push (Python 3.12 y 3.14)
+pytest.ini                config de pytest
+requirements-dev.txt      dependencias solo para los tests
 LICENSE                   MIT
 ```
 

@@ -133,6 +133,16 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
       mucho, conviene darle su preset.
 - [ ] **3.3 — Playwright**, solo si alguna bolsa resulta ser JS-pesada-sin-API.
       No hay ningún caso todavía; no adelantarse.
+- [x] **3.7 — Tests.** 73 tests en `tests/`, sin red ni Telegram: filtros,
+      SQLite (dedupe, umbral de avisos, migración de `source_health`), formato
+      de mensajes y funciones puras de los fetchers. Se corren con `pytest`.
+      Verificados con mutación: romper la precedencia de `exclude`, el umbral
+      de avisos, el escapado de HTML o la migración hace fallar 1, 5, 2 y 13
+      tests respectivamente.
+- [x] **3.8 — CI que corre los tests** en cada push, PR y a mano
+      (`.github/workflows/tests.yml`), sobre Python 3.12 (la de producción) y
+      3.14 (la de desarrollo). Sin secrets: ningún test sale a la red. Los tres
+      badges del README salen de acá.
 - [ ] **3.4 — Limpiar la base cada tanto** (opcional). `data/seen_jobs.db` solo crece.
       Con 15 fuentes tarda años en ser un problema, pero un `DELETE FROM seen
       WHERE ts < ...` de vez en cuando no sobra. **Ojo, hoy no es seguro**: `ts`

@@ -1,0 +1,4 @@
+# Solo para correr los tests. La app en sí no lo necesita: ver requirements.txt.
+-r requirements.txt
+
+pytest>=8.0
