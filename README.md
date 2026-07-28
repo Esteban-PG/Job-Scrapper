@@ -1,7 +1,7 @@
 # Bot de alertas de empleo
 
-[![Tests](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/tests.yml/badge.svg)](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/tests.yml)
-[![Alertas de empleo](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/job-alerts.yml/badge.svg)](https://github.com/Esteban-PG/Job-Scrapper/actions/workflows/job-alerts.yml)
+[![Tests](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/tests.yml/badge.svg)](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/tests.yml)
+[![Alertas de empleo](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml/badge.svg)](https://github.com/Esteban-PG/Job-alert-bot/actions/workflows/job-alerts.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 Monitorea varias bolsas de trabajo y avisa por Telegram **apenas aparece una
@@ -266,11 +266,15 @@ Actions_.
 **El detalle que importa:** el runner arranca limpio en cada corrida. Si no se
 persiste `data/seen_jobs.db`, la base sale vacía y el bot cree que es su primera
 corrida, **cada vez**: siembra en silencio y no notifica nada, nunca. La falla no
-avisa — desde el chat se lee igual que "esta semana no salió nada", y por eso hay
-que verificarla a mano (ver `TODO.md`, 1.3). El workflow lo resuelve con
-`actions/cache`: como las caches de Actions son inmutables, la key lleva el
-`run_id` (siempre distinta) y `restore-keys` recupera la más reciente por
-prefijo.
+avisa — desde el chat se lee igual que "esta semana no salió nada". El workflow lo
+resuelve con `actions/cache`: como las caches de Actions son inmutables, la key
+lleva el `run_id` (siempre distinta) y `restore-keys` recupera la más reciente
+por prefijo.
+
+Conviene verificarlo a mano una vez, porque es el punto que más fácil se rompe y
+el más silencioso: correr el workflow **dos veces seguidas** y confirmar que la
+segunda dice `0 nuevas`. Si dice `sembrando (sin notificar)`, o si el paso
+*Restaurar base de vistos* dice `Cache not found`, la base no está persistiendo.
 
 Tres advertencias de GitHub Actions que conviene saber:
 

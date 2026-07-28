@@ -5,6 +5,9 @@ data/seen_jobs.db
 # Credenciales. La plantilla versionada es .env.example (siempre vacía).
 .env
 
+# Notas de trabajo: son para mí, no para quien visita el repo.
+TODO.md
+
 .venv/
 __pycache__/
 *.pyc

@@ -18,7 +18,7 @@ fetcher con sus pausas entre páginas. LinkedIn e Indeed quedan fuera del bot a
 propósito, porque ahí sí el scraping va contra sus términos.
 """
 
-REPO = "https://github.com/Esteban-PG/Job-Scrapper"
+REPO = "https://github.com/Esteban-PG/Job-alert-bot"
 
 BOT_UA = f"job-alert-bot/1.0 (uso personal; +{REPO})"
 
