@@ -83,6 +83,28 @@ El `id` es la clave de deduplicación: sale del código de vacante de la fuente,
 nunca de la posición en la lista ni de un hash del título. Si el sitio reordena
 sus resultados o corrige una palabra del título, el bot no vuelve a avisar.
 
+### Aviso de fuente caída
+
+Una fuente que se rompe no tumba la corrida: el orquestador la loguea y sigue
+con las demás. El problema es que eso, solo, es invisible — si mañana Moody's
+cambia su API, dejás de recibir vacantes de Moody's y **el silencio se lee igual
+que "no salió nada esta semana"**. Con una sola fuente es tolerable; con quince,
+que alguna se rompa cada tanto es lo esperable.
+
+Por eso el bot avisa por Telegram cuando una fuente se cae, y de nuevo cuando
+vuelve. El estado vive en la tabla `source_health` de la misma base:
+
+- Se avisa recién a la **segunda corrida fallada seguida** (`FAIL_ALERT_AFTER` en
+  `jobbot/config.py`). Un timeout suelto no dispara nada; a `*/30`, dos fallas
+  seguidas ya son treinta minutos caída.
+- Se avisa **una sola vez por caída**, no en cada corrida.
+- Si se caen varias a la vez —lo normal si el que se quedó sin red es el
+  runner— va **un solo mensaje** con todas.
+
+Es la contraparte del punto de arriba: sirve para que el silencio del bot
+signifique siempre "no hay vacantes nuevas" y nunca "hace tres semanas que estoy
+roto".
+
 ## Correr local
 
 ```bash
@@ -389,13 +411,13 @@ run.py                    punto de entrada
 config/
   sources.yaml            fuentes y filtros (lo único que se edita a diario)
 data/
-  seen_jobs.db            vacantes ya vistas (no se versiona)
+  seen_jobs.db            vacantes vistas + salud de las fuentes (no se versiona)
 jobbot/
   cli.py                  orquestador: junta las cuatro piezas
   config.py               .env, rutas y sources.yaml
   filters.py              include / exclude / ubicación
-  storage.py              dedupe en SQLite
-  notify.py               Telegram
+  storage.py              dedupe y salud de fuentes, en SQLite
+  notify.py               Telegram (vacantes y avisos de fuente caída)
   fetchers/
     __init__.py           registro: type -> función
     ats.py                Greenhouse, Lever y Ashby (API JSON pública)

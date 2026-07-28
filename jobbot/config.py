@@ -42,6 +42,7 @@ TG_CHAT = os.getenv("TELEGRAM_CHAT_ID")
 
 SOURCE_PAUSE = 2      # cortesía entre fuentes
 NOTIFY_PAUSE = 0.5    # Telegram tolera ~30 msg/s; vamos muy por debajo
+FAIL_ALERT_AFTER = 2  # corridas seguidas fallando antes de avisar que una fuente se cayó
 
 DEFAULT_FILTERS = {
     "include": [r"\bjunior\b", r"\bjr\b", r"\bentry.?level\b", r"\bdata\b",

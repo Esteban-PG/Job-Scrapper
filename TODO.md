@@ -12,7 +12,10 @@ Funcionando y verificado en vivo:
 - El fetcher de Phenom quedó **parametrizado** (ver 3.2, ya hecho): P&G, Cisco y
   HPE son presets de la misma función.
 - Fuentes y filtros externalizados en `config/sources.yaml`.
-- Dedupe en SQLite, logging por fuente, `--dry-run`, `--source`, `--config`.
+- Dedupe en SQLite, logging por fuente, `--dry-run`, `--source`, `--config`,
+  `--no-seed`.
+- **Aviso por Telegram si una fuente se cae** (y si se recupera), para que el
+  silencio del bot no sea ambiguo. Ver 3.6.
 - Telegram **probado end-to-end**: el bot **@FlippyJobBot** entregó un mensaje real.
 - Workflow de GitHub Actions escrito (`*/30`), con persistencia de la base.
 
@@ -138,7 +141,23 @@ Bloquean el scraping y va contra sus términos. Quedan resueltos aparte:
       No hay ningún caso todavía; no adelantarse.
 - [ ] **3.4 — Limpiar la base cada tanto** (opcional). `data/seen_jobs.db` solo crece.
       Con 15 fuentes tarda años en ser un problema, pero un `DELETE FROM seen
-      WHERE ts < ...` de vez en cuando no sobra.
+      WHERE ts < ...` de vez en cuando no sobra. **Ojo, hoy no es seguro**: `ts`
+      es la primera vez que se vio la vacante y `mark_seen` nunca lo actualiza
+      (`INSERT OR IGNORE`), así que borrar lo viejo saca IDs de vacantes que
+      **siguen publicadas** y te llegan todas de nuevo. Va junto con el 3.5.
+- [ ] **3.5 — `ts` como "última vez vista"** (habilita el 3.4). Que `mark_seen`
+      refresque el `ts` de lo que sigue apareciendo y que `already_seen` ignore
+      lo más viejo que N días. Con eso la limpieza se vuelve segura y, de paso,
+      una vacante que se despublica y **se vuelve a publicar con el mismo ID**
+      pasado ese plazo te vuelve a llegar (hoy no: el veto del ID es para
+      siempre). Son ~10 líneas en `storage.py` más una constante en `config.py`.
+- [x] **3.6 — Avisar cuando una fuente se cae.** Hecho: `source_health` en la
+      base, `record_failure`/`record_success` en `storage.py` y el mensaje en
+      `notify.py`. Avisa a la segunda corrida fallada seguida
+      (`FAIL_ALERT_AFTER`), una sola vez por caída, y avisa también cuando la
+      fuente vuelve. Si se caen varias juntas va un solo mensaje. Probado con
+      una fuente falsa: silencio en la 1ª falla, aviso en la 2ª, silencio en la
+      3ª, aviso de recuperación al volver.
 
 ---
 

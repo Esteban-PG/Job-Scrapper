@@ -9,12 +9,14 @@ import argparse
 import logging
 import time
 
-from .config import (CONFIG_PATH, DB_PATH, NOTIFY_PAUSE, SOURCE_PAUSE, TG_CHAT,
-                     TG_TOKEN, load_config, source_label)
+from .config import (CONFIG_PATH, DB_PATH, FAIL_ALERT_AFTER, NOTIFY_PAUSE,
+                     SOURCE_PAUSE, TG_CHAT, TG_TOKEN, load_config, source_label)
 from .fetchers import FETCHERS
 from .filters import compile_filters, matches
-from .notify import as_plain_text, format_message, notify
-from .storage import already_seen, init_db, is_empty, mark_seen
+from .notify import (as_plain_text, format_health_message, format_message,
+                     notify, send)
+from .storage import (already_seen, init_db, is_empty, mark_seen,
+                      record_failure, record_success)
 
 log = logging.getLogger("jobbot")
 
@@ -116,6 +118,7 @@ def main():
 
     totals = {"jobs": 0, "new": 0, "notified": 0}
     failed = []
+    broken, recovered = [], []
 
     for i, src in enumerate(sources):
         label = source_label(src)
@@ -124,13 +127,26 @@ def main():
             totals["jobs"] += jobs
             totals["new"] += new
             totals["notified"] += notified
+            if not args.dry_run:
+                caida = record_success(con, label)
+                if caida is not None:
+                    recovered.append((label, caida))
         except Exception as exc:
             # Una fuente caída no puede tumbar la corrida entera.
             failed.append(label)
             log.error("%-18s falló: %s: %s", label, type(exc).__name__, exc)
+            if not args.dry_run:
+                avisar, fallas = record_failure(con, label, FAIL_ALERT_AFTER)
+                if avisar:
+                    broken.append((label, f"{type(exc).__name__}: {exc}", fallas))
 
         if i < len(sources) - 1:
             time.sleep(SOURCE_PAUSE)
+
+    # Un solo aviso al final: si se cae la red del runner fallan todas las
+    # fuentes juntas y seis mensajes seguidos no dicen más que uno.
+    if broken or recovered:
+        send(format_health_message(broken, recovered), "aviso de estado")
 
     con.close()
 
