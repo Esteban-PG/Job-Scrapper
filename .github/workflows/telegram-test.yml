@@ -1,0 +1,57 @@
+name: Telegram test
+
+# Manual only: sends one message to check that the repo Secrets actually work.
+# The regular `Job alerts` workflow is no good for this — if the dedupe finds no
+# new postings it notifies nothing, and a green run proves only that the code
+# ran, not that Telegram is reachable.
+on:
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Text to send"
+        required: false
+        default: "🧪 Test from GitHub Actions"
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: Send test message
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Through the environment on purpose, not interpolated into the script:
+          # `${{ }}` inside a `run:` block is a script injection waiting to happen.
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          python - <<'PY'
+          import os
+          import sys
+
+          from jobbot.config import TG_CHAT, TG_TOKEN
+          from jobbot.notify import send
+
+          # Without this guard the job would go green without sending anything:
+          # `send()` falls back to printing when there are no credentials, and
+          # returns True because printing counts as delivering. That's exactly
+          # the false positive this workflow exists to rule out.
+          if not (TG_TOKEN and TG_CHAT):
+              sys.exit("TELEGRAM_TOKEN/TELEGRAM_CHAT_ID are empty — check "
+                       "Settings → Secrets and variables → Actions")
+
+          if not send(os.environ["MESSAGE"], "manual test"):
+              sys.exit("Telegram rejected the send — see the error above")
+
+          print("Message delivered.")
+          PY
