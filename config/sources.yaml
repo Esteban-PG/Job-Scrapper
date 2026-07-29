@@ -17,15 +17,65 @@
 filters:
   # Evaluated against "<title> <location>", lowercased, as regexes.
   # If a title matches EXCLUDE, it's discarded even if it matches INCLUDE.
+  #
+  # INCLUDE is an OR: one match is enough. Note that it mixes two different
+  # ideas — seniority and domain — so the real rule is "junior OR technical",
+  # not "junior AND technical". Narrowing seniority is entirely EXCLUDE's job.
+  #
+  # Words deliberately NOT here, because they were measured against a real day's
+  # catalog and brought in noise rather than jobs:
+  #   security   -> "Security Investigator" (investigations, not infosec)
+  #   support    -> "Trilingual Customer Support Representative"
+  #   associate  -> "Warehouse Associate"
+  #   technician -> "Aqua Systems Technician"
+  #   systems, product, platform -> too generic to mean anything
   include:
+    # Seniority / entry level. These pass on their own, whatever the domain.
     - '\bjunior\b'
     - '\bjr\b'
     - '\bentry.?level\b'
-    - '\bdata\b'
-    - '\bsoftware\b'
-    - '\bqa\b'
-    - '\banalyst\b'
+    - '\bintern\b'
+    - '\binternship\b'
+    - '\btrainee\b'
+    - '\bgraduate\b'
+    - '\bapprentice\b'
+    # Roles.
     - '\bengineer\b'
+    - '\bdeveloper\b'
+    - '\bdev\b'
+    - '\bprogrammer\b'
+    - '\banalyst\b'
+    - '\bscientist\b'
+    - '\barchitect\b'
+    - '\bsre\b'
+    - '\bdevops\b'
+    - '\btester\b'
+    - '\btesting\b'
+    - '\bqa\b'
+    # Domains.
+    - '\bsoftware\b'
+    - '\bdata\b'
+    - '\banalytics\b'
+    - '\bdatabase\b'
+    - '\bdba\b'
+    - '\bback.?end\b'
+    - '\bfront.?end\b'
+    - '\bfull.?stack\b'
+    - '\bcloud\b'
+    - '\binfrastructure\b'
+    - '\bautomation\b'
+    - '\bmachine learning\b'
+    - '\bml\b'
+    # No closing \b on purpose: it has to catch "Cybersecurity" as one word too.
+    - '\bcyber'
+    # Technologies. Cheap insurance: they cost nothing when no title mentions
+    # them, and they catch the posting that names the stack instead of the role.
+    - '\bpython\b'
+    - '\bjava(script)?\b'
+    - '\bsql\b'
+    - '\baws\b'
+    - '\blinux\b'
+    - '\bapi\b'
   exclude:
     - '\bsenior\b'
     - '\bstaff\b'
@@ -35,6 +85,10 @@ filters:
     - '\bdirector\b'
     - '\bsr\.?\b'
     - '\bhead of\b'
+    # `developer` is worth having, but on HPE it drags in five copies of
+    # "Technical Courseware Developer" — writing training material, not code.
+    # Delete this line if you'd rather see them.
+    - '\bcourseware\b'
   # Location hint. Leave it empty ([]) to skip filtering by location — useful
   # when the source already comes filtered to Costa Rica at the origin.
   location_hints:
