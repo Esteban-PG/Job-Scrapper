@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import amazon, equifax, phenom, radancy, workday
+from jobbot.fetchers import amazon, equifax, jibe, phenom, radancy, workday
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -85,6 +85,51 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Jibe / iCIMS ---------------------------------------------------------
+
+def test_jibe_links_to_the_public_page_not_the_icims_login():
+    """`apply_url` points at careers-teknowledge.icims.com/jobs/<id>/login,
+    which is the login screen — same trap as Amazon's `urlNextStep`."""
+    job = jibe._map_job({"req_id": "11870", "title": "FinTech Analyst",
+                         "apply_url": "https://careers-teknowledge.icims.com/jobs/11870/login"},
+                        "https://careers.teknowledge.com", "tek", "TeKnowledge")
+    assert job["url"] == "https://careers.teknowledge.com/jobs/11870"
+    assert "icims" not in job["url"]
+
+
+def test_jibe_collapses_a_location_repeated_with_semicolons():
+    """Some postings repeat the same site: "San Pedro, CR; San Pedro, CR"."""
+    assert jibe._location({"full_location": "San Pedro, Costa Rica; San Pedro, Costa Rica"}) \
+        == "San Pedro, Costa Rica"
+
+
+def test_jibe_keeps_genuinely_distinct_locations():
+    assert jibe._location({"full_location": "San Pedro, Costa Rica; Heredia, Costa Rica"}) \
+        == "San Pedro, Costa Rica · Heredia, Costa Rica"
+
+
+def test_jibe_builds_the_location_from_parts_without_full_location():
+    assert jibe._location({"city": "San Pedro", "state": "San José",
+                           "country": "Costa Rica"}) == "San Pedro, San José, Costa Rica"
+
+
+def test_jibe_reads_the_category_out_of_the_list_of_dicts():
+    assert jibe._category({"categories": [{"name": "Customer Support"}]}) == "Customer Support"
+    assert jibe._category({"categories": []}) == ""
+    assert jibe._category({}) == ""
+
+
+def test_jibe_raises_on_the_silent_error_response():
+    """An unknown country answers HTTP 200 with `{"error": ...}` and no `jobs`.
+    Unchecked, that reads exactly like "no openings here", forever."""
+    with pytest.raises(RuntimeError, match="rejected the query"):
+        jibe._check_error({"error": "invalid location"}, "TeKnowledge", ["Wakanda"])
+
+
+def test_jibe_accepts_a_normal_response():
+    jibe._check_error({"jobs": [], "totalCount": 0}, "TeKnowledge", ["Costa Rica"])
 
 
 # --- Phenom ---------------------------------------------------------------

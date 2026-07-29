@@ -23,6 +23,7 @@ from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
+from .jibe import fetch_jibe, fetch_teknowledge
 from .phenom import fetch_cisco, fetch_hpe, fetch_pg, fetch_phenom
 from .radancy import fetch_moodys, fetch_radancy
 from .workday import fetch_workday
@@ -45,6 +46,17 @@ FETCHERS = {
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),
     "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
+    "teknowledge": lambda s: fetch_teknowledge(
+        countries=s.get("countries", ["Costa Rica"])),
+    # Any other Jibe/iCIMS board: it comes from sources.yaml.
+    "jibe": lambda s: fetch_jibe(
+        site=s["site"],
+        countries=s.get("countries", ["Costa Rica"]),
+        id_prefix=s.get("id_prefix") or s["type"],
+        name=s.get("name"),
+        domain=s.get("domain"),
+        keywords=s.get("keywords", ""),
+    ),
     # Any other Radancy/TalentBrew board: it comes from sources.yaml.
     "radancy": lambda s: fetch_radancy(
         site=s["site"],

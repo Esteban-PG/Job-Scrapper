@@ -134,7 +134,10 @@ filters:
     - 'administration'
     - 'workplace'
     - '\bsales\b'
-    - 'customer service'
+    # Broader than 'customer service' on purpose: TeKnowledge files everything
+    # under "Customer Support", and the pattern also covers Success/Experience.
+    # A genuinely technical role here is still rescued by `strong_include`.
+    - 'customer'
     - 'manufacturing'
     - 'supply chain'
     - 'business operations'
@@ -176,6 +179,10 @@ sources:
   - type: moodys
     countries: ["Costa Rica"]
 
+  # TeKnowledge — Jibe front-end, iCIMS underneath (1 GET, no token).
+  - type: teknowledge
+    countries: ["Costa Rica"]
+
   # Amazon — its own ATS (amazon.jobs), 1 POST with no token and no cookies.
   # `countries` accepts the name or the ISO-2 code ("CR").
   #
@@ -209,6 +216,16 @@ sources:
   #   page_id: "page123-prod"
   #   ref_num: "XXXGLOBAL"
   #   id_prefix: "companyw"
+  #   countries: ["Costa Rica"]
+
+  # Any other Jibe/iCIMS board (assets on app.jibecdn.com, and a
+  # `domain=<tenant>.jibeapply.com` parameter in the request). `domain` is
+  # optional — the endpoint answers without it — but worth copying anyway.
+  # - type: jibe
+  #   name: "Company U"
+  #   site: "https://careers.companyu.com"
+  #   domain: "companyu.jibeapply.com"
+  #   id_prefix: "companyu"
   #   countries: ["Costa Rica"]
 
   # Any other Radancy/TalentBrew board (assets on tbcdn.talentbrew.com). You

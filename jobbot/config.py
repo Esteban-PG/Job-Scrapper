@@ -67,7 +67,7 @@ DEFAULT_FILTERS = {
                        r"\bback.?end\b", r"\bfront.?end\b", r"\bfull.?stack\b"],
     "nontech_categories": [r"accounting", r"finance", r"sourcing", r"procurement",
                            r"human resources", r"talent", r"administration",
-                           r"workplace", r"\bsales\b", r"customer service",
+                           r"workplace", r"\bsales\b", r"customer",
                            r"manufacturing", r"supply chain", r"business operations",
                            r"legal", r"marketing"],
 }
