@@ -18,6 +18,11 @@ on:
     # min/month; on a public repo (this one) the minutes are free and unlimited.
     - cron: "7,37 * * * *"
   workflow_dispatch:        # "Run workflow" button for manual testing
+    inputs:
+      dry_run:
+        description: "Preview only — print what it would notify, send nothing, record nothing"
+        type: boolean
+        default: false
 
 # Two runs in parallel would step on the seen-jobs database and could notify
 # duplicates: make it wait for the previous one.
@@ -68,7 +73,16 @@ jobs:
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python run.py
+          # Through the environment, not interpolated into the script. Empty on
+          # a scheduled run, which is exactly what we want: cron never previews.
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::Dry run — nothing will be sent and the database won't be written"
+            python run.py --dry-run
+          else
+            python run.py
+          fi
 
       - name: Save seen-jobs database
         if: always()
