@@ -56,6 +56,20 @@ DEFAULT_FILTERS = {
                 r"\bmanager\b", r"\bdirector\b", r"\bsr\.?\b", r"\bhead of\b"],
     "location_hints": [r"remote", r"remoto", r"latam", r"americas",
                        r"costa rica", r"anywhere", r"heredia", r"san jos[eé]"],
+    # Words that are technical on their own, used to rescue a posting whose ATS
+    # category isn't technical. `software` is left out on purpose: "Software
+    # Contract Negotiator" is a procurement role. See jobbot/filters.py.
+    "strong_include": [r"\bengineer\b", r"\bdeveloper\b", r"\bdev\b",
+                       r"\bprogrammer\b", r"\barchitect\b", r"\bscientist\b",
+                       r"\bsre\b", r"\bdevops\b", r"\bqa\b", r"\btester\b",
+                       r"\bautomation\b", r"\bcloud\b", r"\bcyber",
+                       r"\bdatabase\b", r"\bdba\b", r"\bmachine learning\b",
+                       r"\bback.?end\b", r"\bfront.?end\b", r"\bfull.?stack\b"],
+    "nontech_categories": [r"accounting", r"finance", r"sourcing", r"procurement",
+                           r"human resources", r"talent", r"administration",
+                           r"workplace", r"\bsales\b", r"customer service",
+                           r"manufacturing", r"supply chain", r"business operations",
+                           r"legal", r"marketing"],
 }
 
 

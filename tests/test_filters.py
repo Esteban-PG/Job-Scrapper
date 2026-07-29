@@ -70,3 +70,56 @@ def test_tolerates_postings_without_a_location():
         "include": [r"\bsoftware\b"], "exclude": [], "location_hints": [],
     })
     assert matches({"title": "Software Engineer"}, no_location)
+
+
+# --- the ATS category gate ------------------------------------------------
+
+GATED = compile_filters({
+    "include": [r"\bdata\b", r"\banalyst\b", r"\bengineer\b", r"\bdeveloper\b"],
+    "exclude": [],
+    "location_hints": [],
+    "strong_include": [r"\bengineer\b", r"\bdeveloper\b"],
+    "nontech_categories": [r"accounting", r"finance", r"human resources"],
+})
+
+
+def test_a_weak_word_is_not_enough_in_a_nontechnical_category():
+    """'FP&A Analyst' under Accounting passes the word filter through
+    `analyst` and is exactly the noise the gate exists to remove."""
+    assert not matches({"title": "FP&A Analyst", "category": "Accounting"}, GATED)
+
+
+def test_a_strong_word_rescues_a_nontechnical_category():
+    """Companies file roles under the business unit they serve: this is a real
+    BI Developer sitting under Finance & Audit."""
+    assert matches({"title": "Business Intelligence Developer ll",
+                    "category": "Finance & Audit"}, GATED)
+
+
+def test_a_weak_word_is_enough_in_a_technical_category():
+    assert matches({"title": "Data Analyst",
+                    "category": "Product and Engineering"}, GATED)
+
+
+def test_a_posting_without_a_category_skips_the_gate():
+    """Radancy's listing carries no category. An absent category is not
+    evidence that the role is non-technical."""
+    assert matches({"title": "Data Analyst", "category": ""}, GATED)
+    assert matches({"title": "Data Analyst"}, GATED)
+
+
+def test_the_gate_is_off_when_no_categories_are_configured():
+    ungated = compile_filters({
+        "include": [r"\banalyst\b"], "exclude": [], "location_hints": [],
+        "strong_include": [r"\bengineer\b"], "nontech_categories": [],
+    })
+    assert matches({"title": "FP&A Analyst", "category": "Accounting"}, ungated)
+
+
+def test_the_category_does_not_count_as_an_include_match():
+    """The invariant that makes the gate safe: if the category were folded into
+    the matched text, every HPE posting would match `\\bengineer\\b` through its
+    "Engineering & QA" category and the include list would stop meaning
+    anything."""
+    assert not matches({"title": "Warehouse Associate",
+                        "category": "Engineering & QA"}, GATED)

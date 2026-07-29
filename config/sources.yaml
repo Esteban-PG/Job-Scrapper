@@ -89,6 +89,57 @@ filters:
     # "Technical Courseware Developer" — writing training material, not code.
     # Delete this line if you'd rather see them.
     - '\bcourseware\b'
+  #
+  # Category gate. Five of the six sources carry the ATS's own `category`, which
+  # is structured data and so beats guessing from the title. It is NOT a hard
+  # block: companies file roles under the business unit they serve, so a real BI
+  # Developer sits under "Finance & Audit". So a non-technical category only
+  # raises the bar — the title then needs a word from `strong_include`, and a
+  # weak one like `analyst` or `data` no longer suffices.
+  #
+  # Moody's carries no category (Radancy's listing doesn't include it), so it
+  # skips this gate and keeps working purely on words.
+  #
+  # Set `nontech_categories: []` to turn the whole gate off.
+  strong_include:
+    - '\bengineer\b'
+    - '\bdeveloper\b'
+    - '\bdev\b'
+    - '\bprogrammer\b'
+    - '\barchitect\b'
+    - '\bscientist\b'
+    - '\bsre\b'
+    - '\bdevops\b'
+    - '\bqa\b'
+    - '\btester\b'
+    - '\bautomation\b'
+    - '\bcloud\b'
+    - '\bcyber'
+    - '\bdatabase\b'
+    - '\bdba\b'
+    - '\bmachine learning\b'
+    - '\bback.?end\b'
+    - '\bfront.?end\b'
+    - '\bfull.?stack\b'
+    # `software` is deliberately absent: "Software Contract Negotiator / Data
+    # Analyst" is a Sourcing & Procurement role. Real software titles carry
+    # `engineer`, `developer` or `architect` anyway.
+  nontech_categories:
+    - 'accounting'
+    - 'finance'
+    - 'sourcing'
+    - 'procurement'
+    - 'human resources'
+    - 'talent'
+    - 'administration'
+    - 'workplace'
+    - '\bsales\b'
+    - 'customer service'
+    - 'manufacturing'
+    - 'supply chain'
+    - 'business operations'
+    - 'legal'
+    - 'marketing'
   # Location hint. Leave it empty ([]) to skip filtering by location — useful
   # when the source already comes filtered to Costa Rica at the origin.
   location_hints:
