@@ -11,7 +11,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import amazon, equifax, jibe, phenom, radancy, workday
+from jobbot.fetchers import amazon, equifax, ibm, jibe, phenom, radancy, workday
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -85,6 +85,53 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- IBM ------------------------------------------------------------------
+
+def test_ibm_uses_the_jobid_and_not_the_hash_as_id():
+    """`_id` is a 64-char hash: stable, but useless in a notification. The
+    stable code humans can look up is the URL's jobId."""
+    source = {"url": "https://careers.ibm.com/careers/JobDetail?jobId=120944",
+              "_id": "f5fc3dfee0da55f5"}
+    assert ibm._job_id(source) == "120944"
+
+
+def test_ibm_falls_back_to_the_hash_without_a_jobid():
+    assert ibm._job_id({"url": "https://careers.ibm.com/x", "_id": "a" * 64}) == "a" * 16
+
+
+def test_ibm_replaces_the_iso2_with_the_country_name():
+    """The city field carries "Heredia, CR" — `location_hints` has nothing to
+    match "costa rica" against unless the name is put back."""
+    assert ibm._location({"field_keyword_19": "Heredia, CR",
+                          "field_keyword_05": "Costa Rica"}) == "Heredia, Costa Rica"
+
+
+def test_ibm_does_not_repeat_a_country_already_in_the_city():
+    assert ibm._location({"field_keyword_19": "Heredia, Costa Rica",
+                          "field_keyword_05": "Costa Rica"}) == "Heredia, Costa Rica"
+
+
+def test_ibm_tolerates_a_missing_city():
+    assert ibm._location({"field_keyword_05": "Costa Rica"}) == "Costa Rica"
+
+
+def test_ibm_filters_one_country_with_a_term_and_several_with_a_should():
+    assert ibm._country_filter(["Costa Rica"]) == {
+        "term": {"field_keyword_05": "Costa Rica"}}
+    assert ibm._country_filter(["Costa Rica", "Mexico"]) == {"bool": {"should": [
+        {"term": {"field_keyword_05": "Costa Rica"}},
+        {"term": {"field_keyword_05": "Mexico"}}]}}
+
+
+def test_ibm_reads_the_country_catalog_out_of_the_aggregation():
+    """That catalog is what turns a typo into an error instead of a silent
+    zero: an unknown country returns total 0, not a failure."""
+    payload = {"aggregations": {"all_countries": {"field_keyword_05": {
+        "buckets": [{"key": "Costa Rica"}, {"key": "Mexico"}]}}}}
+    assert ibm._known_countries(payload) == {"Costa Rica", "Mexico"}
+    assert ibm._known_countries({}) == set()
 
 
 # --- Jibe / iCIMS ---------------------------------------------------------

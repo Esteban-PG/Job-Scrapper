@@ -23,6 +23,7 @@ from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
+from .ibm import fetch_ibm
 from .jibe import fetch_jibe, fetch_teknowledge
 from .phenom import fetch_cisco, fetch_hpe, fetch_pg, fetch_phenom
 from .radancy import fetch_moodys, fetch_radancy
@@ -46,6 +47,11 @@ FETCHERS = {
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),
     "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
+    "ibm": lambda s: fetch_ibm(
+        countries=s.get("countries", ["Costa Rica"]),
+        name=s.get("name", "IBM"),
+        keywords=s.get("keywords", ""),
+    ),
     "teknowledge": lambda s: fetch_teknowledge(
         countries=s.get("countries", ["Costa Rica"])),
     # Any other Jibe/iCIMS board: it comes from sources.yaml.
