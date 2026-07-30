@@ -25,6 +25,24 @@ would let through remote postings from any country. That's why `fetch_radancy`
 warns if it had to discard anything: if that shows up in the logs, the server's
 filter broke and the location parameters need a look.
 
+Two tenant shapes, both handled
+-------------------------------
+Not every tenant answers that JSON endpoint. Citi returns it with `results`
+empty and instead **renders the postings into the search page itself**, whose
+path carries the filters:
+
+    GET /search-jobs/{keyword}/{orgId}/{subId}/{geoId}/{lat}/{lon}/{radius}/{page}
+
+So `_fetch_page` asks the JSON endpoint first — cheaper and a more explicit
+contract — and falls back to that server-rendered page when it comes back empty.
+Same idea as `phenom.py` cycling its ddoKey candidates and keeping whichever one
+returns postings.
+
+The markup differs too: Moody's serves `search-results-list__*` classes and Citi
+the newer `sr-*` ones, for identical data. `_parse_items` tries both skins. A
+tenant that renders a third skin would parse as zero postings, which the
+down-source alert would not catch — it isn't an error, just an empty list.
+
 Adding another company on Radancy takes the domain and the `OrganizationIds`,
 both visible in the DevTools request.
 
@@ -33,6 +51,7 @@ Standalone check (prints what it finds, without notifying):
 """
 
 import time
+from urllib.parse import quote
 
 import requests
 from bs4 import BeautifulSoup
@@ -42,6 +61,7 @@ from .useragents import BROWSER_UA
 # Verified: RecordsPerPage=50 brings the 22 Costa Rica postings in a single call.
 PAGE_SIZE = 50
 MAX_PAGES = 20        # safety cap
+DISTANCE = 50         # radius, in the unit the site expects (miles)
 PAGE_PAUSE = 1.0
 
 # Radancy filters by geographic node (GeoNames IDs) + coordinates, not by name.
@@ -66,6 +86,20 @@ HEADERS = {
     "X-Requested-With": "XMLHttpRequest",
 }
 
+# The server-rendered page, used when the JSON endpoint comes back empty.
+HTML_HEADERS = {"User-Agent": BROWSER_UA, "Accept": "text/html"}
+
+# Two HTML skins seen live for the same platform and the same data. Moody's
+# serves the older one, Citi the newer `sr-` one.
+SKINS = (
+    {"item": "li.search-results-list__item",
+     "link": "a.search-results-list__job-link",
+     "location": ".job-location"},
+    {"item": "li.sr-job-item",
+     "link": "a.sr-job-item__link",
+     "location": ".sr-job-location"},
+)
+
 
 def _geo(country):
     geo = COUNTRY_GEO.get(country.strip().lower())
@@ -86,7 +120,7 @@ def _params(org_id, country, geo, page, page_size, keywords):
         "CurrentPage": page,
         "RecordsPerPage": page_size,
         "TotalContentResults": "",
-        "Distance": 50,
+        "Distance": DISTANCE,
         "RadiusUnitType": 0,
         "Keywords": keywords,
         "Location": country,
@@ -122,10 +156,23 @@ def _total_pages(soup):
 
 
 def _parse_items(soup, site, label, org_id):
-    """Each posting is an <li> with the title's <a> and a location <li>."""
+    """Each posting is an <li> with the title's <a> and a location element.
+
+    Radancy serves two HTML skins for the same data — Moody's the older
+    `search-results-list__*` one, Citi the newer `sr-*` one — so both selector
+    sets are tried and the first that finds anything wins.
+    """
+    for skin in SKINS:
+        jobs = _parse_skin(soup, site, label, org_id, skin)
+        if jobs:
+            return jobs
+    return []
+
+
+def _parse_skin(soup, site, label, org_id, skin):
     jobs = []
-    for item in soup.select("li.search-results-list__item"):
-        link = item.select_one("a.search-results-list__job-link")
+    for item in soup.select(skin["item"]):
+        link = item.select_one(skin["link"])
         if not link:
             continue
         # The job id is in data-job-id and also as the last segment of the URL;
@@ -134,7 +181,7 @@ def _parse_items(soup, site, label, org_id):
         job_id = link.get("data-job-id") or href.rstrip("/").split("/")[-1]
         if not job_id:
             continue
-        loc = item.select_one(".job-location")
+        loc = item.select_one(skin["location"])
         jobs.append({
             # The org_id goes in the id just like the tenant does on Workday:
             # that way two companies on Radancy can't collide.
@@ -151,8 +198,41 @@ def _parse_items(soup, site, label, org_id):
     return jobs
 
 
+def _ssr_url(site, org_id, sub_id, country, geo, page):
+    """The server-rendered search page, whose path carries the filters:
+        /search-jobs/{keyword}/{orgId}/{subId}/{geoId}/{lat}/{lon}/{radius}/{page}
+    Some tenants (Citi) render the postings straight into this document and
+    return nothing from the JSON endpoint.
+    """
+    return (f"{site}/search-jobs/{quote(country)}/{org_id}/{sub_id}/"
+            f"{geo['path']}/{geo['lat']}/{geo['lon']}/{int(DISTANCE)}/{page}")
+
+
+def _fetch_page(session, site, org_id, sub_id, country, geo, page, page_size,
+                keywords):
+    """Returns the soup of one results page.
+
+    The JSON endpoint is tried first because it is the cheaper, more explicit
+    contract. If it answers with an empty `results` the server-rendered page is
+    tried instead — same idea as `phenom.py` cycling its ddoKey candidates and
+    keeping whichever one returns postings.
+    """
+    r = session.get(site + "/en/search-jobs/results", timeout=30,
+                    headers=HEADERS,
+                    params=_params(org_id, country, geo, page, page_size, keywords))
+    r.raise_for_status()
+    html = r.json().get("results") or ""
+    if html.strip():
+        return BeautifulSoup(html, "html.parser"), "json"
+
+    r = session.get(_ssr_url(site, org_id, sub_id, country, geo, page),
+                    timeout=30, headers=HTML_HEADERS)
+    r.raise_for_status()
+    return BeautifulSoup(r.text, "html.parser"), "html"
+
+
 def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
-                  keywords=""):
+                  keywords="", sub_id=2):
     """
     Returns the postings of a Radancy/TalentBrew board, already normalized.
 
@@ -164,8 +244,6 @@ def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
     """
     site = site.rstrip("/")
     label = name or site.split("//")[-1]
-    url = site + "/en/search-jobs/results"
-
     session = requests.Session()
     session.headers.update(HEADERS)
 
@@ -178,11 +256,8 @@ def fetch_radancy(site, org_id, countries=("Costa Rica",), name=None,
         page = 1
 
         while page <= MAX_PAGES:
-            r = session.get(url, timeout=30,
-                            params=_params(org_id, country, geo, page,
-                                           PAGE_SIZE, keywords))
-            r.raise_for_status()
-            soup = BeautifulSoup(r.json().get("results") or "", "html.parser")
+            soup, via = _fetch_page(session, site, org_id, sub_id, country, geo,
+                                    page, PAGE_SIZE, keywords)
 
             found = _parse_items(soup, site, label, org_id)
             if not found:

@@ -179,6 +179,14 @@ sources:
   - type: moodys
     countries: ["Costa Rica"]
 
+  # Citi — Radancy too, but this tenant serves the postings server-rendered and
+  # returns nothing from the JSON endpoint; the fetcher falls back on its own.
+  - type: radancy
+    name: "Citi"
+    site: "https://jobs.citi.com"
+    org_id: "287"
+    countries: ["Costa Rica"]
+
   # Workday (the company runs its own product). Config only — the `workday`
   # template already covered it. Note this tenant names the country facet
   # `Location_Country`, not `locationCountry` like P&G does.

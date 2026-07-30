@@ -243,6 +243,46 @@ def test_radancy_fails_clearly_on_a_country_it_does_not_have():
         radancy._geo("Wakanda")
 
 
+def test_radancy_parses_the_older_moodys_skin():
+    from bs4 import BeautifulSoup
+    html = ('<li class="search-results-list__item">'
+            '<a class="search-results-list__job-link" data-job-id="97934207472" '
+            'href="/en/job/heredia/software-engineer/49841/97934207472">'
+            'Software Engineer</a>'
+            '<span class="job-location">Heredia, Costa Rica</span></li>')
+    jobs = radancy._parse_items(BeautifulSoup(html, "html.parser"),
+                                "https://careers.moodys.com", "Moody's", "49841")
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "rdc-49841-97934207472"
+    assert jobs[0]["location"] == "Heredia, Costa Rica"
+
+
+def test_radancy_parses_the_newer_citi_skin():
+    """Same platform and same data, different class names. Guessing one skin is
+    what made this template return zero postings for Citi."""
+    from bs4 import BeautifulSoup
+    html = ('<li class="sr-job-item">'
+            '<h3 class="sr-job-item__title">'
+            '<a class="sr-job-item__link" data-job-id="98481831680" '
+            'href="/job/escazu/credit-risk-2lod-sr-analyst-c12/287/98481831680">'
+            'Credit Risk 2LOD Sr Analyst - C12</a></h3>'
+            '<span class="sr-job-item__facet sr-job-location">'
+            'Escazú, Provincia de San José, Costa Rica</span></li>')
+    jobs = radancy._parse_items(BeautifulSoup(html, "html.parser"),
+                               "https://jobs.citi.com", "Citi", "287")
+    assert len(jobs) == 1
+    assert jobs[0]["id"] == "rdc-287-98481831680"
+    assert "Costa Rica" in jobs[0]["location"]
+    assert jobs[0]["url"].startswith("https://jobs.citi.com/job/")
+
+
+def test_radancy_builds_the_server_rendered_url_with_the_filters_in_the_path():
+    url = radancy._ssr_url("https://jobs.citi.com", "287", 2, "Costa Rica",
+                           radancy._geo("Costa Rica"), 1)
+    assert url == ("https://jobs.citi.com/search-jobs/Costa%20Rica/287/2/"
+                   "3624060/10.00000/-84.00000/50/1")
+
+
 def test_radancy_sends_the_five_location_fields_together():
     """With a partial combination the API doesn't fail: it returns the global
     catalog. Either all five go or none of them do."""
