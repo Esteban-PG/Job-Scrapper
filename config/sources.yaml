@@ -179,6 +179,16 @@ sources:
   - type: moodys
     countries: ["Costa Rica"]
 
+  # Workday (the company runs its own product). Config only — the `workday`
+  # template already covered it. Note this tenant names the country facet
+  # `Location_Country`, not `locationCountry` like P&G does.
+  - type: workday
+    tenant: workday
+    dc: wd5
+    site: "Workday"
+    countries: ["Costa Rica"]
+    name: "Workday"
+
   # IBM — its own unified search endpoint (Elasticsearch-shaped), no token.
   # The country name is validated against IBM's own index, so a typo raises
   # instead of quietly returning zero.

@@ -33,6 +33,9 @@ import requests
 
 from .useragents import BROWSER_UA
 
+# The country facet is named differently per tenant; see _resolve_country_facets.
+COUNTRY_FACET_PARAMS = ("locationCountry", "Location_Country", "country")
+
 # Workday rejects limit > 20 with HTTP 400.
 PAGE_SIZE = 20
 MAX_RESULTS = 400  # safety cap
@@ -75,28 +78,39 @@ def _search(session, url, applied, offset, search_text):
     return r.json()
 
 
+def _matching_ids(values, wanted):
+    return [v["id"] for v in values or []
+            if (v.get("descriptor") or "").strip().lower() in wanted and v.get("id")]
+
+
 def _resolve_country_facets(payload, countries):
     """Translates country names -> facet IDs, reading the catalog that comes in
-    the response itself. Returns the list of IDs found."""
+    the response itself. Returns `(facet_parameter, ids)`.
+
+    The parameter name comes back because it is NOT the same on every tenant and
+    it is also the key `appliedFacets` has to be filed under. Two shapes seen
+    live: P&G hangs the countries off a `locationMainGroup` group under
+    `locationCountry`, while Workday's own tenant exposes `Location_Country` as
+    a flat top-level facet. Guessing one name is what made this template fall
+    back to fetching the whole world on that second tenant.
+    """
     wanted = {c.strip().lower() for c in countries}
-    ids = []
 
     for facet in payload.get("facets", []):
-        # Countries hang off a 'locationMainGroup' group with subgroups
-        # (Country / State / City); we take the locationCountry facetParameter.
-        groups = facet.get("values") or []
-        for group in groups:
-            if group.get("facetParameter") != "locationCountry":
-                continue
-            for value in group.get("values") or []:
-                if (value.get("descriptor") or "").strip().lower() in wanted:
-                    ids.append(value["id"])
-        if facet.get("facetParameter") == "locationCountry":
-            for value in facet.get("values") or []:
-                if (value.get("descriptor") or "").strip().lower() in wanted:
-                    ids.append(value["id"])
+        param = facet.get("facetParameter")
+        if param in COUNTRY_FACET_PARAMS:
+            ids = _matching_ids(facet.get("values"), wanted)
+            if ids:
+                return param, ids
+        # Nested: a group of subgroups (Country / State / City).
+        for group in facet.get("values") or []:
+            gparam = group.get("facetParameter")
+            if gparam in COUNTRY_FACET_PARAMS:
+                ids = _matching_ids(group.get("values"), wanted)
+                if ids:
+                    return gparam, ids
 
-    return ids
+    return None, []
 
 
 def _req_id(posting):
@@ -129,12 +143,16 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
 
     applied = {}
     if countries:
-        ids = _resolve_country_facets(first, countries)
+        param, ids = _resolve_country_facets(first, countries)
         if ids:
-            applied = {"locationCountry": ids}
+            applied = {param: ids}
         else:
+            # Worth shouting about: falling through here means fetching the
+            # global catalog, and since `location_hints` includes "remote" a
+            # remote posting from any country would sail past the filter.
             print(f"[warn] Workday {label}: no country facet found for "
-                  f"{list(countries)}; fetching all and letting the orchestrator filter")
+                  f"{list(countries)}; fetching all and letting the orchestrator "
+                  f"filter — check the facet name against COUNTRY_FACET_PARAMS")
 
     # If a filter was applied, the first response is no longer usable: repeat it.
     payload = first if not applied else _search(session, url, applied, 0, search_text)

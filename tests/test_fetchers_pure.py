@@ -254,15 +254,39 @@ def test_radancy_sends_the_five_location_fields_together():
 
 # --- Workday --------------------------------------------------------------
 
-def test_workday_resolves_the_country_facet_from_the_response():
-    """The IDs are opaque GUIDs and differ on every tenant: they're resolved
-    against the catalog that comes in the response itself."""
+def test_workday_resolves_the_nested_country_facet():
+    """P&G's shape: the countries hang off a `locationMainGroup` group. The IDs
+    are opaque GUIDs, resolved against the catalog in the response itself."""
     payload = {"facets": [{"values": [{
         "facetParameter": "locationCountry",
         "values": [{"descriptor": "Costa Rica", "id": "99abe7e6"},
                    {"descriptor": "Mexico", "id": "other"}],
     }]}]}
-    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == ["99abe7e6"]
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == \
+        ("locationCountry", ["99abe7e6"])
+
+
+def test_workday_resolves_the_flat_country_facet():
+    """Workday's own tenant exposes `Location_Country` as a top-level facet.
+    Guessing a single name is what made this template silently fall back to
+    fetching the global catalog."""
+    payload = {"facets": [
+        {"facetParameter": "remoteType", "values": [{"descriptor": "Remote"}]},
+        {"facetParameter": "Location_Country",
+         "values": [{"descriptor": "Costa Rica", "id": "99abe7e6"},
+                    {"descriptor": "Ireland", "id": "other"}]},
+    ]}
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == \
+        ("Location_Country", ["99abe7e6"])
+
+
+def test_workday_returns_the_parameter_name_it_matched():
+    """`appliedFacets` has to be keyed by that same name, so returning the ids
+    alone isn't enough."""
+    payload = {"facets": [{"facetParameter": "Location_Country",
+                           "values": [{"descriptor": "Mexico", "id": "mx"}]}]}
+    param, ids = workday._resolve_country_facets(payload, ["Mexico"])
+    assert param == "Location_Country" and ids == ["mx"]
 
 
 def test_workday_finds_no_facet_for_an_absent_country():
@@ -270,7 +294,7 @@ def test_workday_finds_no_facet_for_an_absent_country():
         "facetParameter": "locationCountry",
         "values": [{"descriptor": "Mexico", "id": "x"}],
     }]}]}
-    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == []
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == (None, [])
 
 
 def test_workday_pulls_the_job_code_from_bulletfields():
