@@ -61,7 +61,10 @@ DEFAULT_FILTERS = {
     # Contract Negotiator" is a procurement role. See jobbot/filters.py.
     "strong_include": [r"\bengineer\b", r"\bdeveloper\b", r"\bdev\b",
                        r"\bprogrammer\b", r"\barchitect\b", r"\bscientist\b",
-                       r"\bsre\b", r"\bdevops\b", r"\bqa\b", r"\btester\b",
+                       r"\bsre\b", r"\bdevops\b", r"\bqa\b", r"quality assurance",
+                       r"\btester\b", r"\btesting\b", r"\btest\b", r"\bsdet\b",
+                       r"\bverification\b", r"\bselenium\b", r"\bcypress\b",
+                       r"\bappium\b", r"\bjmeter\b",
                        r"\bautomation\b", r"\bcloud\b", r"\bcyber",
                        r"\bdatabase\b", r"\bdba\b", r"\bmachine learning\b",
                        r"\bback.?end\b", r"\bfront.?end\b", r"\bfull.?stack\b"],

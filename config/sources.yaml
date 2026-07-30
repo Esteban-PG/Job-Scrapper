@@ -49,9 +49,21 @@ filters:
     - '\barchitect\b'
     - '\bsre\b'
     - '\bdevops\b'
+    # QA / testing. `\bqa\b` does NOT match "Quality Assurance" spelled out,
+    # which is why both forms are here. Bare `quality` is deliberately absent:
+    # it drags in "Supplier Quality Engineer" and "Quality Inspector" from
+    # manufacturing, and `engineer` in `strong_include` would rescue them past
+    # the category gate. Same reason `\bqc\b` is out — quality control is a
+    # factory-floor term here.
     - '\btester\b'
     - '\btesting\b'
+    - '\btest\b'
     - '\bqa\b'
+    - 'quality assurance'
+    - '\bsdet\b'
+    - '\bverification\b'
+    - '\bvalidation\b'
+    - '\be2e\b'
     # Domains.
     - '\bsoftware\b'
     - '\bdata\b'
@@ -76,6 +88,17 @@ filters:
     - '\baws\b'
     - '\blinux\b'
     - '\bapi\b'
+    # QA tooling. Zero false-positive risk: nothing outside testing puts these
+    # in a job title.
+    - '\bselenium\b'
+    - '\bcypress\b'
+    - '\bplaywright\b'
+    - '\bappium\b'
+    - '\bjmeter\b'
+    - '\bpostman\b'
+    - '\bjunit\b'
+    - '\btestng\b'
+    - '\bcucumber\b'
   exclude:
     - '\bsenior\b'
     - '\bstaff\b'
@@ -111,7 +134,18 @@ filters:
     - '\bsre\b'
     - '\bdevops\b'
     - '\bqa\b'
+    - 'quality assurance'
     - '\btester\b'
+    # `testing` was in `include` but missing here, so a "Testing Specialist" in
+    # a non-technical category got dropped while a "Tester" got rescued.
+    - '\btesting\b'
+    - '\btest\b'
+    - '\bsdet\b'
+    - '\bverification\b'
+    - '\bselenium\b'
+    - '\bcypress\b'
+    - '\bappium\b'
+    - '\bjmeter\b'
     - '\bautomation\b'
     - '\bcloud\b'
     - '\bcyber'
