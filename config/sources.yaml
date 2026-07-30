@@ -209,6 +209,11 @@ sources:
   - type: hpe
     countries: ["Costa Rica"]
 
+  # Roche — Phenom too, but the newer CareerConnect skin (clientName /
+  # cultureName instead of refNum / lang, and no pageId).
+  - type: roche
+    countries: ["Costa Rica"]
+
   # Moody's — Radancy/TalentBrew (a GET that returns HTML inside a JSON).
   - type: moodys
     countries: ["Costa Rica"]

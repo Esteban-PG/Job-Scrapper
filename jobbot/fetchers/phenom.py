@@ -343,8 +343,48 @@ def fetch_hpe(countries=("Costa Rica",), name="HPE"):
     )
 
 
+def fetch_roche(countries=("Costa Rica",), name="Roche"):
+    """Roche — https://careers.roche.com (verified: 19 postings in Costa Rica,
+    out of 1230 globally).
+
+    A newer Phenom skin (CareerConnect) whose payload differs from the P&G /
+    Cisco / HPE one, which is what `extra` is for: it names the tenant
+    `clientName` instead of `refNum`, the language `cultureName` instead of
+    `lang`, and sends no `pageId` at all.
+
+    Two things that cost a round of debugging:
+
+    - The payload the browser sends when you tick a facet has **no `jobs: True`**
+      and comes back with `hits: 0`, `totalHits: 19` and no job array at all —
+      only facet counts. It looks like the right call and returns nothing usable.
+      `_build_payload` already sends `jobs`/`counts`, which is what makes the
+      same `refineSearch` return the 19 postings.
+    - `keyword` is **ignored**: searching "Costa Rica" returns the same 1230 as
+      an empty keyword. The country is filtered by `selected_fields.country`,
+      exactly as on the other Phenom tenants.
+    """
+    return fetch_phenom(
+        site="https://careers.roche.com",
+        warmup_path="/global/en/search-results",
+        # This variant doesn't use pageId; the field rides along empty.
+        page_id="", page_name="search-results", page_type="search-results",
+        id_prefix="roche",
+        countries=countries, name=name,
+        page_size=30,
+        extra={
+            "clientName": "ROCHGLOBAL",
+            "cultureName": "en_global",
+            "eventType": "search",
+            "globalSearch": True,
+            "sortBy": "Most relevant",
+            "keyword": "", "location": "", "locationData": {},
+            "jdsource": "facet",
+        },
+    )
+
+
 if __name__ == "__main__":
-    for fetch in (fetch_pg, fetch_cisco, fetch_hpe):
+    for fetch in (fetch_pg, fetch_cisco, fetch_hpe, fetch_roche):
         jobs = fetch()
         source = jobs[0]["source"] if jobs else fetch.__name__
         print(f"\n{len(jobs)} {source} postings in Costa Rica:\n")

@@ -25,7 +25,8 @@ from .equifax import fetch_equifax
 from .generic_html import fetch_html
 from .ibm import fetch_ibm
 from .jibe import fetch_jibe, fetch_teknowledge
-from .phenom import fetch_cisco, fetch_hpe, fetch_pg, fetch_phenom
+from .phenom import (fetch_cisco, fetch_hpe, fetch_pg, fetch_phenom,
+                     fetch_roche)
 from .radancy import fetch_moodys, fetch_radancy
 from .workday import fetch_workday
 
@@ -46,6 +47,7 @@ FETCHERS = {
     "pg": lambda s: fetch_pg(countries=s.get("countries", ["Costa Rica"])),
     "cisco": lambda s: fetch_cisco(countries=s.get("countries", ["Costa Rica"])),
     "hpe": lambda s: fetch_hpe(countries=s.get("countries", ["Costa Rica"])),
+    "roche": lambda s: fetch_roche(countries=s.get("countries", ["Costa Rica"])),
     "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
     "ibm": lambda s: fetch_ibm(
         countries=s.get("countries", ["Costa Rica"]),
