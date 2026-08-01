@@ -343,6 +343,31 @@ def fetch_hpe(countries=("Costa Rica",), name="HPE"):
     )
 
 
+def fetch_bcg(countries=("Costa Rica",), name="BCG"):
+    """BCG — https://careers.bcg.com (verified: 13 postings in Costa Rica, out of
+    879 globally).
+
+    Classic Phenom payload on `page17-ds`, with two extra facets in `all_fields`
+    (`company`, `jobType`) that this tenant returns. `irs: false` rides along in
+    `extra` because the site sends it.
+
+    The browser filters by putting the country in `keywords`, URL-encoded inside
+    the JSON ("Costa%20Rica"). This preset uses `selected_fields.country`
+    instead — the structured facet every other Phenom tenant uses, and the one
+    that doesn't depend on the country appearing in the text.
+    """
+    return fetch_phenom(
+        site="https://careers.bcg.com",
+        warmup_path="/search-results",
+        page_id="page17-ds", page_name="search-results",
+        page_type="search-results", id_prefix="bcg",
+        countries=countries, name=name,
+        page_size=30,
+        all_fields=["country", "city", "category", "company", "type", "jobType"],
+        extra={"irs": False, "locationData": {}},
+    )
+
+
 def fetch_mastercard(countries=("Costa Rica",), name="Mastercard"):
     """Mastercard — https://careers.mastercard.com (verified: 5 postings in
     Costa Rica).

@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # BCG — Phenom, page17-ds. The site filters by country through `keywords`;
+  # the preset uses the structured facet instead.
+  - type: bcg
+    countries: ["Costa Rica"]
+
   # Mastercard — Phenom, classic payload (pageId + all_fields), en_us market.
   - type: mastercard
     countries: ["Costa Rica"]
