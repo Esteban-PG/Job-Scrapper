@@ -343,6 +343,31 @@ def fetch_hpe(countries=("Costa Rica",), name="HPE"):
     )
 
 
+def fetch_mastercard(countries=("Costa Rica",), name="Mastercard"):
+    """Mastercard — https://careers.mastercard.com (verified: 5 postings in
+    Costa Rica).
+
+    The classic Phenom payload, same shape as Cisco and HPE — `pageId`,
+    `all_fields`, `jdsource: facets` — so nothing here but the site's own values.
+    Runs on the US market (`en_us`/`us`) like HPE; that does not limit the
+    postings to the States, the country is still filtered by
+    `selected_fields.country`.
+
+    One of the five is filed in Bogotá with Costa Rica among its six sites, so it
+    arrives annotated rather than dropped (see `_location`).
+    """
+    return fetch_phenom(
+        site="https://careers.mastercard.com",
+        warmup_path="/search-results",
+        page_id="page11", page_name="search", page_type="search",
+        id_prefix="mc",
+        lang="en_us", locale="us",
+        countries=countries, name=name,
+        page_size=30,
+        extra={"locationData": {}},
+    )
+
+
 def fetch_roche(countries=("Costa Rica",), name="Roche"):
     """Roche — https://careers.roche.com (verified: 19 postings in Costa Rica,
     out of 1230 globally).

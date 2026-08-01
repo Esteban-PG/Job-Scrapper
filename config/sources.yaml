@@ -45,6 +45,13 @@ filters:
     - '\bdev\b'
     - '\bprogrammer\b'
     - '\banalyst\b'
+    # In this market a "Consultant" at Mastercard-style advisory shops is doing
+    # analyst work, so it belongs here. Weak on purpose, like `analyst`: it stays
+    # out of `strong_include` so the category gate can still cut a Finance or
+    # Accounting consultant. Note `\bconsulting\b` is deliberately absent — it
+    # appears as a department suffix ("Advisors & Consulting Services") on every
+    # posting of that org, whatever the actual role is.
+    - '\bconsultant\b'
     - '\bscientist\b'
     - '\barchitect\b'
     - '\bsre\b'
@@ -207,6 +214,10 @@ sources:
 
   # HPE — Phenom just like the two above (site on the en_us market).
   - type: hpe
+    countries: ["Costa Rica"]
+
+  # Mastercard — Phenom, classic payload (pageId + all_fields), en_us market.
+  - type: mastercard
     countries: ["Costa Rica"]
 
   # Roche — Phenom too, but the newer CareerConnect skin (clientName /

@@ -12,13 +12,18 @@ The idea is to replace a pile of noisy email alerts — each with its own format
 its own cadence and its own noise — with **a single filtered feed**.
 
 ```
-23:15:48 INFO    equifax             11 jobs ·   3 new ·   2 notified
-23:15:51 INFO    pg                   2 jobs ·   0 new ·   0 notified
-23:15:53 INFO    cisco                4 jobs ·   1 new ·   1 notified
-23:15:56 INFO    hpe                 20 jobs ·   2 new ·   1 notified
-23:15:58 INFO    moodys              22 jobs ·   3 new ·   2 notified
-23:16:00 INFO    amazon               8 jobs ·   1 new ·   1 notified
-23:16:00 INFO    total: 67 jobs · 9 new · 6 notified · 6/6 sources ok
+23:15:48 INFO    equifax             13 jobs ·   3 new ·   1 notified
+23:15:51 INFO    pg                   3 jobs ·   0 new ·   0 notified
+23:15:53 INFO    cisco                5 jobs ·   1 new ·   1 notified
+23:15:56 INFO    hpe                 24 jobs ·   2 new ·   1 notified
+23:15:58 INFO    roche               19 jobs ·   4 new ·   2 notified
+23:16:01 INFO    moodys              23 jobs ·   3 new ·   2 notified
+23:16:04 INFO    Citi                 8 jobs ·   1 new ·   0 notified
+23:16:07 INFO    Workday              5 jobs ·   0 new ·   0 notified
+23:16:10 INFO    ibm                  5 jobs ·   1 new ·   1 notified
+23:16:13 INFO    teknowledge          6 jobs ·   0 new ·   0 notified
+23:16:15 INFO    amazon               8 jobs ·   1 new ·   1 notified
+23:16:15 INFO    total: 119 jobs · 16 new · 9 notified · 11/11 sources ok
 ```
 
 ```
@@ -35,17 +40,23 @@ board: they outsource it to a well-known ATS. Once you classify the sources by
 platform, they all collapse into 4-5 reusable templates, and adding one more
 company becomes a single YAML entry.
 
-| Platform             | How to recognize it               | How it's solved              | Status                                |
-| -------------------- | --------------------------------- | ---------------------------- | ------------------------------------- |
-| Greenhouse           | `boards.greenhouse.io/<company>`  | Public JSON API              | template ready                        |
-| Lever                | `jobs.lever.co/<company>`         | Public JSON API              | template ready                        |
-| Ashby                | `jobs.ashbyhq.com/<company>`      | Public JSON API              | template ready                        |
-| Workday              | `<tenant>.<dc>.myworkdayjobs.com` | JSON POST to `/wday/cxs/`    | ✅ verified live                      |
-| Phenom               | `/widgets` endpoint               | POST + CSRF token            | ✅ verified live (P&G, Cisco, HPE)    |
-| Equifax              | its own XML feed                  | 1 GET to the feed            | ✅ verified live                      |
-| Radancy / TalentBrew | assets on `tbcdn.talentbrew.com`  | GET with HTML inside the JSON | ✅ verified live (Moody's)            |
-| Amazon               | `amazon.jobs/api/jobs/search`     | 1 POST, no token             | ✅ verified live                      |
-| Heavy JS with no API | nothing in the Network tab        | Playwright                   | last resort, no cases yet             |
+| Platform             | How to recognize it                | How it's solved               | Status                                        |
+| -------------------- | ---------------------------------- | ----------------------------- | --------------------------------------------- |
+| Greenhouse           | `boards.greenhouse.io/<company>`   | Public JSON API               | template ready, no company yet                |
+| Lever                | `jobs.lever.co/<company>`          | Public JSON API               | template ready, no company yet                |
+| Ashby                | `jobs.ashbyhq.com/<company>`       | Public JSON API               | template ready, no company yet                |
+| Workday              | `<tenant>.<dc>.myworkdayjobs.com`  | JSON POST to `/wday/cxs/`     | ✅ verified live (P&G, Workday)                |
+| Phenom               | `/widgets` endpoint                | POST + CSRF token in a JWT    | ✅ verified live (P&G, Cisco, HPE, Roche)      |
+| Radancy / TalentBrew | assets on `tbcdn.talentbrew.com`   | GET, HTML inside JSON or SSR  | ✅ verified live (Moody's, Citi)               |
+| Jibe / iCIMS         | `app.jibecdn.com`, `domain=…jibeapply.com` | 1 GET, no token       | ✅ verified live (TeKnowledge)                 |
+| Equifax              | its own XML feed                   | 1 GET to the feed             | ✅ verified live                               |
+| Amazon               | `amazon.jobs/api/jobs/search`      | 1 POST, no token              | ✅ verified live                               |
+| IBM                  | `www-api.ibm.com/search/api/v2`    | 1 POST, Elasticsearch-shaped  | ✅ verified live                               |
+| Heavy JS with no API | nothing in the Network tab         | Playwright                    | last resort, no cases yet                     |
+
+Eleven companies, six platforms. Four of them — Workday, Phenom, Radancy and Jibe
+— are parameterized templates, so the next company on any of those is a YAML
+entry. Equifax, Amazon and IBM run their own thing and needed their own module.
 
 **LinkedIn and Indeed are deliberately left out.** They actively block scraping
 and it goes against their terms of service. For those two, the sane way out is
@@ -148,9 +159,11 @@ source is still alive:
 
 ```bash
 python -m jobbot.fetchers.equifax
-python -m jobbot.fetchers.phenom     # P&G, Cisco and HPE
+python -m jobbot.fetchers.phenom     # P&G, Cisco, HPE and Roche
 python -m jobbot.fetchers.workday
 python -m jobbot.fetchers.radancy    # Moody's
+python -m jobbot.fetchers.jibe       # TeKnowledge
+python -m jobbot.fetchers.ibm
 python -m jobbot.fetchers.amazon
 ```
 
@@ -161,7 +174,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-73 tests, ~0.15 s, and **none of them touch the network or Telegram**: they run
+98 tests, ~0.15 s, and **none of them touch the network or Telegram**: they run
 without credentials and offline. They cover the filters, the SQLite database
 (dedupe, alert threshold and the `source_health` migration), the message
 formatting and the pure functions of the fetchers — date parsing, location
@@ -250,13 +263,42 @@ touching Python:
 
 ```yaml
 filters:
-  include: ['\bjunior\b', '\bdata\b', '\bqa\b', ...]
-  exclude: ['\bsenior\b', '\bmanager\b', ...]
-  location_hints: ["remote", "costa rica", "heredia", ...]
+  include: ['\bjunior\b', '\bdata\b', '\bqa\b', '\bdeveloper\b', ...]   # 55
+  exclude: ['\bsenior\b', '\bmanager\b', ...]                          #  9
+  location_hints: ["remote", "costa rica", "heredia", ...]             #  9
+  strong_include: ['\bengineer\b', '\barchitect\b', '\bqa\b', ...]     # 28
+  nontech_categories: ['accounting', 'finance', 'customer', ...]       # 15
 ```
 
-A title that matches `exclude` is dropped even if it matches `include`. To skip
-filtering by location, use `location_hints: []`.
+Four gates, in this order:
+
+1. **`exclude`** — a title that matches is dropped even if it matches `include`.
+2. **`include`** — an OR: one match is enough. It mixes two ideas, seniority and
+   domain, so the real rule is "junior OR technical", not "junior AND technical".
+   Narrowing seniority is entirely `exclude`'s job.
+3. **`location_hints`** — what lets "remote" through. `[]` skips the gate.
+4. **The category gate** — the only one that reads structured data instead of
+   guessing from the title.
+
+### The category gate
+
+Ten of the eleven sources carry the ATS's own `category`, which beats any amount
+of word matching. It is deliberately **not** a hard block: companies file roles
+under the business unit they serve, so a real BI Developer sits under
+"Finance & Audit" and an HR internship sits under "Cloud". So a non-technical
+category only raises the bar — the title then needs a word from
+`strong_include`, and a weak one like `analyst` or `data` no longer suffices.
+
+Measured on one day's real catalog, it removed 10 of 40 postings that passed the
+word filter (accounting analysts, an HR enablement role, an administration
+analyst) while keeping the two technical ones misfiled under Finance.
+
+The category is never folded into the matched text. If it were, every HPE posting
+would match `\bengineer\b` through its "Engineering & QA" category and `include`
+would stop meaning anything. Moody's carries no category at all, so it skips this
+gate and runs on words alone — an absent category is not evidence of anything.
+
+`nontech_categories: []` turns the gate off.
 
 ## Deploy
 
@@ -433,19 +475,74 @@ JobCreator`), but the API is the simplest of them all: a POST with no token and
   them. Cisco (`cisco.wd5/Cisco_Careers`) and HPE (`hpe.wd5/Jobsathpe`) are the
   same case: if they're ever added as `type: workday`, the corresponding Phenom
   preset has to be removed.
+- **Roche runs a newer Phenom skin (CareerConnect)** that renames half the
+  payload: `clientName` instead of `refNum`, `cultureName` instead of `lang`, and
+  no `pageId` at all. All of it fits in the template's `extra`. Two traps: the
+  request the browser fires when you tick a facet has **no `jobs: True`** and
+  comes back with `hits: 0` and no job array — only facet counts, while
+  `totalHits` still shows the right number, so it looks like the correct call and
+  returns nothing usable. And `keyword` is **ignored**: searching "Costa Rica"
+  returns the same 1230 as an empty keyword. The country filter is
+  `selected_fields.country`, same as every other Phenom tenant.
+- **Workday names the country facet differently per tenant.** P&G hangs it off
+  `locationMainGroup` under `locationCountry`; Workday's own tenant exposes
+  `Location_Country` as a flat top-level facet. Guessing one name made the
+  template fall through to its "fetch everything" fallback: 346 postings, nearly
+  all American. That is not a benign failure — `location_hints` includes
+  "remote", so a remote role in Virginia would have sailed past the location
+  gate. `_resolve_country_facets` now returns the parameter name it matched,
+  because `appliedFacets` has to be keyed by that same name. Side finding: the
+  Costa Rica GUID is identical on both tenants, so these IDs are Workday-global,
+  not per-tenant as first assumed.
+- **Radancy has two tenant shapes and two HTML skins.** Moody's answers the
+  `/en/search-jobs/results` JSON endpoint; Citi returns that same endpoint with
+  `results` empty and instead renders the postings into the search page, whose
+  path carries the filters
+  (`/search-jobs/{kw}/{orgId}/{subId}/{geoId}/{lat}/{lon}/{radius}/{page}`). So
+  the fetcher tries JSON first and falls back to the page. The markup differs
+  too: `search-results-list__*` at Moody's, `sr-*` at Citi. A tenant with a third
+  skin would parse as zero postings, and the down-source alert would **not** catch
+  it — an empty list isn't an error.
+- **Jibe / iCIMS (TeKnowledge)**: `apply_url` is useless as a link — it points at
+  `careers-teknowledge.icims.com/jobs/<id>/login`, the login screen, exactly like
+  Amazon's `urlNextStep`. The public page is `<site>/jobs/<req_id>`. An unknown
+  country answers HTTP 200 carrying `{"error": …}` and **no `jobs` key**, which
+  unchecked reads like "this company has no openings here", forever. The
+  `domain=<tenant>.jibeapply.com` parameter turned out to be optional, and
+  `BOT_UA` is enough — no need to pose as a browser. Unlike Radancy, `location`
+  alone filters correctly, but dropping it returns the global catalog (43 across
+  6 countries), so the country is still revalidated locally.
+- **IBM** runs its own unified search endpoint, Elasticsearch-shaped, behind
+  opaque field names (`field_keyword_05` is the country, `_08` the business area,
+  `_18` the level, `_19` the city). An unknown country returns **`total: 0`, not
+  an error**, so there is no way to tell "IBM isn't hiring here" from a typo — the
+  country is therefore validated first against the aggregation that lists all 45
+  countries in the index, the same trick `workday.py` uses. `field_keyword_19`
+  carries the ISO-2 (`"Heredia, CR"`), so the location is rebuilt with the
+  country name for `location_hints` to match, exactly like Amazon's ISO-3. The
+  four `aggs` blocks the browser sends only paint the sidebar counts; only the
+  country one is kept, and only to validate.
 
 ### Verification status
 
-| Source                     | Verified live                                                    |
-| -------------------------- | ---------------------------------------------------------------- |
-| Equifax (XML feed)         | ✅ 11 postings in Costa Rica                                     |
-| P&G (Phenom)               | ✅ 2 postings in Costa Rica                                      |
-| Cisco (Phenom)             | ✅ 4 postings in Costa Rica (out of 1023 globally)               |
-| HPE (Phenom)               | ✅ 20 postings in Costa Rica (out of 1061 globally), 8 multi-site |
-| Moody's (Radancy)          | ✅ 22 postings in Costa Rica (out of 251 globally)               |
-| Amazon (own ATS)           | ✅ 8 technical postings in Costa Rica (73 unfiltered by category) |
-| Workday (tenant `pg`)      | ✅ 2 postings, the same ones as Phenom                           |
-| Greenhouse / Lever / Ashby | ⚠️ code ready, no real company configured yet                    |
+Postings in Costa Rica, and how many survive the filters. Counts drift as the
+boards change; these are one day's snapshot.
+
+| Source                     | Fetched | Pass | Notes                                        |
+| -------------------------- | ------: | ---: | -------------------------------------------- |
+| Equifax (XML feed)         |      13 |    2 | mostly Accounting, cut by the category gate  |
+| P&G (Phenom)               |       3 |    0 | only consumer-relations roles                |
+| Cisco (Phenom)             |       5 |    3 | out of 1023 globally                         |
+| HPE (Phenom)               |      24 |    9 | out of 1061 globally, 8 multi-site           |
+| Roche (Phenom CareerConnect) |    19 |    9 | out of 1230 globally; best signal of the lot |
+| Moody's (Radancy, JSON)    |      23 |   11 | out of 251 globally                          |
+| Citi (Radancy, SSR)        |       8 |    2 | server-rendered, newer `sr-` markup          |
+| Workday (tenant `workday`) |       5 |    0 | all management or instructional design       |
+| IBM (own search API)       |       5 |    4 | 2 of the 4 are internships filed under Cloud |
+| TeKnowledge (Jibe/iCIMS)   |       6 |    0 | all Customer Support                         |
+| Amazon (own ATS)           |       8 |    6 | 73 unfiltered by category                    |
+| **Total**                  | **119** | **46** |                                            |
+| Greenhouse / Lever / Ashby |       — |    — | ⚠️ code ready, never run live                |
 
 ## Stack
 
@@ -474,13 +571,16 @@ jobbot/
     ats.py                Greenhouse, Lever and Ashby (public JSON API)
     amazon.py             amazon.jobs (POST with no token)
     equifax.py            XML feed
-    phenom.py             Phenom (POST + CSRF in a JWT) + P&G/Cisco/HPE presets
-    radancy.py            Radancy/TalentBrew (HTML inside the JSON) + Moody's
+    ibm.py                IBM's own search endpoint (Elasticsearch-shaped)
+    jibe.py               Jibe/iCIMS + TeKnowledge preset
+    phenom.py             Phenom (POST + CSRF in a JWT) + P&G/Cisco/HPE/Roche
+    radancy.py            Radancy/TalentBrew (JSON or SSR) + Moody's, Citi
     workday.py            Workday (CXS POST + facets)
     generic_html.py       last resort: CSS selector
-tests/                    73 tests, no network (see tests/README.md)
+tests/                    98 tests, no network (see tests/README.md)
 .github/workflows/
-  job-alerts.yml          the bot, every 30 min
+  job-alerts.yml          the bot, every 30 min (+ manual dry-run button)
+  telegram-test.yml       manual-only: proves the Secrets reach Telegram
   tests.yml               pytest on every push (Python 3.12 and 3.14)
 pytest.ini                pytest config
 requirements-dev.txt      test-only dependencies
