@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Oracle — Oracle Recruiting Cloud, siteNumber CX_45001. The country is an
+  # opaque geography id (see COUNTRY_LOCATIONS in the fetcher).
+  - type: oracle
+    countries: ["Costa Rica"]
+
   # Microsoft — Eightfold.ai (PCSX) on its own domain. GET, no token. Careful:
   # a misspelled country returns zero postings silently, not an error.
   - type: microsoft
