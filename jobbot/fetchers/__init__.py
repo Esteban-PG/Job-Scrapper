@@ -27,7 +27,7 @@ from .equifax import fetch_equifax
 from .generic_html import fetch_html
 from .ibm import fetch_ibm
 from .jibe import fetch_jibe, fetch_teknowledge
-from .oraclecloud import fetch_oracle, fetch_oraclecloud
+from .oraclecloud import fetch_akamai, fetch_oracle, fetch_oraclecloud
 from .phenom import (fetch_bcg, fetch_cisco, fetch_hpe, fetch_mastercard,
                      fetch_pg, fetch_phenom, fetch_roche)
 from .radancy import fetch_moodys, fetch_radancy
@@ -64,10 +64,13 @@ FETCHERS = {
     "microsoft": lambda s: fetch_microsoft(
         countries=s.get("countries", ["Costa Rica"])),
     "oracle": lambda s: fetch_oracle(countries=s.get("countries", ["Costa Rica"])),
+    "akamai": lambda s: fetch_akamai(countries=s.get("countries", ["Costa Rica"])),
     # Any other Oracle Recruiting Cloud board: siteNumber, plus the host if the
     # tenant isn't served from the default one.
     "oraclecloud": lambda s: fetch_oraclecloud(
         site_number=s["site_number"],
+        # Per tenant: ids are not portable between companies.
+        location_ids={k.lower(): v for k, v in s["location_ids"].items()},
         countries=s.get("countries", ["Costa Rica"]),
         host=s.get("host", "https://eeho.fa.us2.oraclecloud.com"),
         id_prefix=s.get("id_prefix") or s["type"],

@@ -12,7 +12,7 @@ from xml.etree import ElementTree as ET
 import pytest
 
 from jobbot.fetchers import (amazon, ats, bamboohr, eightfold, equifax, ibm,
-                             jibe, phenom, radancy, workday)
+                             jibe, oraclecloud, phenom, radancy, workday)
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -86,6 +86,38 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Oracle Recruiting Cloud ----------------------------------------------
+
+def test_oracle_location_ids_are_per_source():
+    """Verified by crossing them live: Akamai's Costa Rica id returns 0 on
+    Oracle's tenant and vice versa. A module-wide table would have handed the
+    second tenant the first one's id and quietly returned nothing."""
+    assert oraclecloud._location_id(
+        "Costa Rica", {"costa rica": "300000000469120"}) == "300000000469120"
+
+
+def test_oracle_raises_on_a_country_the_source_has_no_id_for():
+    """A wrong id returns TotalJobsCount 0, which reads exactly like "this
+    company isn't hiring here" — so it has to fail loudly instead."""
+    with pytest.raises(ValueError, match="per tenant"):
+        oraclecloud._location_id("Wakanda", {"costa rica": "1"})
+    with pytest.raises(ValueError):
+        oraclecloud._location_id("Costa Rica", None)
+
+
+def test_oracle_builds_the_finder_syntax():
+    """`;` after the finder name, `,` between parameters."""
+    finder = oraclecloud._finder("CX_1", "300000000469120", 25, 25)
+    assert finder.startswith("findReqs;siteNumber=CX_1,")
+    assert "offset=25" in finder and "limit=25" in finder
+    assert "selectedLocationsFacet=300000000469120" in finder
+
+
+def test_oracle_job_url_is_derived_from_the_site_number():
+    assert oraclecloud._job_url("https://x.oraclecloud.com", "CX_1", "3578") == \
+        "https://x.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/3578"
 
 
 # --- Eightfold / PCSX -----------------------------------------------------

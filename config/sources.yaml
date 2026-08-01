@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Akamai — Oracle Recruiting Cloud too, but its own Fusion host and its own
+  # geography id (ids are per tenant, not portable).
+  - type: akamai
+    countries: ["Costa Rica"]
+
   # Oracle — Oracle Recruiting Cloud, siteNumber CX_45001. The country is an
   # opaque geography id (see COUNTRY_LOCATIONS in the fetcher).
   - type: oracle

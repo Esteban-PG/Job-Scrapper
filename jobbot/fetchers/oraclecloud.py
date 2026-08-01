@@ -22,13 +22,19 @@ Sibling endpoints that are NOT the postings and should be ignored:
 not a country name — the same shape of problem as Workday's GUIDs. Worse, the
 response's `locationsFacet` only lists the **18 most common** locations, so
 Costa Rica isn't in it and there's nothing to resolve the name against the way
-`workday.py` does. Hence the hardcoded table below.
+`workday.py` does. So the ids have to be carried in config, one per source.
+
+**The ids are per tenant**, unlike Workday's, which turned out to be global.
+Verified by crossing them: Akamai's Costa Rica id returns 0 on Oracle's tenant
+and Oracle's returns 0 on Akamai's. So `location_ids` is a per-source mapping,
+not a module-wide table — a shared table would have handed the second tenant the
+first one's id and quietly returned nothing.
 
 And it fails quietly in both directions: an invalid id returns
-`TotalJobsCount: 0` — indistinguishable from "Oracle isn't hiring here" — while
-dropping the filter returns the global catalog (2321 postings). So the ids are
-verified one by one, unknown countries raise, and every posting is revalidated
-locally against `PrimaryLocation`.
+`TotalJobsCount: 0` — indistinguishable from "this company isn't hiring here" —
+while dropping the filter returns the global catalog (2321 postings on Oracle's
+tenant). So the ids are verified one by one, unknown countries raise, and every
+posting is revalidated locally against `PrimaryLocation`.
 
 Standalone check (prints what it finds, without notifying):
     python -m jobbot.fetchers.oraclecloud
@@ -49,26 +55,19 @@ DEFAULT_HOST = "https://eeho.fa.us2.oraclecloud.com"
 API_PATH = "/hcmRestApi/resources/latest/recruitingCEJobRequisitions"
 EXPAND = "requisitionList.workLocation,requisitionList.secondaryLocations"
 
-# Oracle geography ids. Verified against siteNumber CX_45001: the id returns
-# only its own country, not the global catalog — which is the symptom of a wrong
-# one. To find another country's id, filter by it on the careers site and read
-# `selectedLocationsFacet` out of the request's query string in DevTools.
-COUNTRY_LOCATIONS = {
-    "costa rica": "300000000106785",
-}
-
 HEADERS = {"User-Agent": BOT_UA, "Accept": "application/json"}
 
 
-def _location_id(country):
-    location_id = COUNTRY_LOCATIONS.get(country.strip().lower())
+def _location_id(country, location_ids):
+    """Per tenant, deliberately: see the module docstring."""
+    location_id = (location_ids or {}).get(country.strip().lower())
     if not location_id:
         raise ValueError(
-            f"Oracle filters by an opaque geography id and I don't have the one "
-            f"for {country!r}. A wrong id doesn't fail, it returns zero postings "
-            f"forever. Add it to COUNTRY_LOCATIONS in "
-            f"jobbot/fetchers/oraclecloud.py: filter that country on the careers "
-            f"site and read `selectedLocationsFacet` from the request's query."
+            f"Oracle filters by an opaque geography id and this source has none "
+            f"for {country!r}. A wrong or missing id doesn't fail, it returns "
+            f"zero postings forever. Ids are per tenant, so it can't be borrowed "
+            f"from another company: filter that country on this board and read "
+            f"`locationId`/`selectedLocationsFacet` from the request's query."
         )
     return location_id
 
@@ -112,13 +111,16 @@ def _map_job(req, host, site_number, id_prefix, label):
     }
 
 
-def fetch_oraclecloud(site_number, countries=("Costa Rica",), host=DEFAULT_HOST,
-                      id_prefix="orc", name=None, keywords=""):
+def fetch_oraclecloud(site_number, location_ids, countries=("Costa Rica",),
+                      host=DEFAULT_HOST, id_prefix="orc", name=None,
+                      keywords=""):
     """
     Returns the postings of an Oracle Recruiting Cloud board, already normalized.
 
     site_number  the tenant's site ("CX_45001")
-    countries    country names; they have to be in COUNTRY_LOCATIONS
+    location_ids {country_name_lowercase: geography_id} for THIS tenant; the
+                 ids are not portable between companies
+    countries    country names; they have to be keys of `location_ids`
     host         the Fusion Apps origin serving the REST API
     id_prefix    prefix of the dedupe id; keep it unique across sources
     name         readable name for the notification
@@ -135,7 +137,7 @@ def fetch_oraclecloud(site_number, countries=("Costa Rica",), host=DEFAULT_HOST,
     discarded = 0
 
     for country in countries:
-        location_id = _location_id(country)
+        location_id = _location_id(country, location_ids)
         needle = country.strip().lower()
         offset = 0
         total = None
@@ -186,8 +188,22 @@ def fetch_oraclecloud(site_number, countries=("Costa Rica",), host=DEFAULT_HOST,
 def fetch_oracle(countries=("Costa Rica",), name="Oracle"):
     """Oracle — careers.oracle.com, siteNumber CX_45001 (verified: 2 postings in
     Costa Rica, out of 2321 globally)."""
-    return fetch_oraclecloud(site_number="CX_45001", countries=countries,
-                             id_prefix="orc", name=name)
+    return fetch_oraclecloud(site_number="CX_45001",
+                             location_ids={"costa rica": "300000000106785"},
+                             countries=countries, id_prefix="orc", name=name)
+
+
+def fetch_akamai(countries=("Costa Rica",), name="Akamai"):
+    """Akamai — jobs.akamai.com, siteNumber CX_1 on its own Fusion host
+    (verified: 10 postings in Costa Rica).
+
+    Its Costa Rica id is NOT Oracle's: crossing them returns 0 on both sides.
+    """
+    return fetch_oraclecloud(
+        site_number="CX_1",
+        location_ids={"costa rica": "300000000469120"},
+        host="https://fa-extu-saasfaprod1.fa.ocs.oraclecloud.com",
+        countries=countries, id_prefix="akamai", name=name)
 
 
 if __name__ == "__main__":
