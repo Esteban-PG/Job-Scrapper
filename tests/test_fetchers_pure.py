@@ -11,8 +11,9 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import (amazon, ats, bamboohr, eightfold, equifax, ibm,
-                             jibe, oraclecloud, phenom, radancy, workday)
+from jobbot.fetchers import (amazon, ats, attrax, bamboohr, eightfold,
+                             equifax, ibm, jibe, oraclecloud, phenom, radancy,
+                             workday)
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -86,6 +87,42 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Attrax ---------------------------------------------------------------
+
+HTML_ATTRAX = """
+<div class="attrax-vacancy-tile" data-jobid="5831">
+  <a class="attrax-vacancy-tile__title" href="/job/cybersecurity-jid-5831">
+     Cybersecurity &amp; Automation Intern</a>
+  <div class="attrax-vacancy-tile__location-freetext">
+    <p class="attrax-vacancy-tile__item-label">Location</p>
+    <p class="attrax-vacancy-tile__item-value">Heredia, Costa Rica</p></div>
+  <span class="attrax-vacancy-tile__option-department-valueset">
+     Information Technology &amp; Systems</span>
+</div>"""
+
+
+def test_attrax_reads_the_stable_id_from_the_tile():
+    """`data-jobid` is the source's own code; `generic_html.py` would have used
+    the href instead."""
+    from bs4 import BeautifulSoup
+    jobs = attrax._parse_tiles(BeautifulSoup(HTML_ATTRAX, "html.parser"),
+                               "https://jobs.experian.com", "exp", "Experian")
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job["id"] == "exp-5831"
+    assert job["title"] == "Cybersecurity & Automation Intern"
+    assert job["location"] == "Heredia, Costa Rica"
+    assert job["category"] == "Information Technology & Systems"
+    assert job["url"] == "https://jobs.experian.com/job/cybersecurity-jid-5831"
+
+
+def test_attrax_skips_a_tile_without_an_id_or_a_link():
+    from bs4 import BeautifulSoup
+    assert attrax._parse_tiles(
+        BeautifulSoup('<div class="attrax-vacancy-tile"></div>', "html.parser"),
+        "https://x.com", "exp", "Experian") == []
 
 
 # --- Oracle Recruiting Cloud ----------------------------------------------

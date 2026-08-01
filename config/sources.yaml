@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Experian — Attrax careers site, server-rendered HTML (no JSON endpoint).
+  # Different company from the `equifax` source above, despite the names.
+  - type: experian
+    countries: ["Costa Rica"]
+
   # Akamai — Oracle Recruiting Cloud too, but its own Fusion host and its own
   # geography id (ids are per tenant, not portable).
   - type: akamai

@@ -21,6 +21,7 @@ entry in FETCHERS. Nothing else gets touched.
 
 from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
+from .attrax import fetch_attrax, fetch_experian_jobs
 from .bamboohr import fetch_bamboohr, fetch_gorillalogic
 from .eightfold import fetch_eightfold, fetch_microsoft
 from .equifax import fetch_equifax
@@ -65,6 +66,16 @@ FETCHERS = {
         countries=s.get("countries", ["Costa Rica"])),
     "oracle": lambda s: fetch_oracle(countries=s.get("countries", ["Costa Rica"])),
     "akamai": lambda s: fetch_akamai(countries=s.get("countries", ["Costa Rica"])),
+    "experian": lambda s: fetch_experian_jobs(
+        countries=s.get("countries", ["Costa Rica"])),
+    # Any other Attrax careers site: only the origin is needed.
+    "attrax": lambda s: fetch_attrax(
+        site=s["site"],
+        countries=s.get("countries", ["Costa Rica"]),
+        id_prefix=s.get("id_prefix") or s["type"],
+        name=s.get("name"),
+        path=s.get("path", "/jobs"),
+    ),
     # Any other Oracle Recruiting Cloud board: siteNumber, plus the host if the
     # tenant isn't served from the default one.
     "oraclecloud": lambda s: fetch_oraclecloud(
