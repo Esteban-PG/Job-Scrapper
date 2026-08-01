@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Gorilla Logic — BambooHR. The structured location fields come back null, so
+  # the country is matched against the title text (see the fetcher's docstring).
+  - type: gorillalogic
+    countries: ["Costa Rica"]
+
   # BCG — Phenom, page17-ds. The site filters by country through `keywords`;
   # the preset uses the structured facet instead.
   - type: bcg

@@ -11,8 +11,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import (amazon, ats, equifax, ibm, jibe, phenom, radancy,
-                             workday)
+from jobbot.fetchers import (amazon, ats, bamboohr, equifax, ibm, jibe, phenom,
+                             radancy, workday)
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -86,6 +86,50 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- BambooHR -------------------------------------------------------------
+
+JOB_BHR = {"id": "184",
+           "jobOpeningName": ".Net/C# Engineer - AA, Remote: Colombia - Costa Rica, Full Time, GP",
+           "departmentLabel": "Engineering",
+           "location": {"city": None, "state": None},
+           "atsLocation": {"country": None, "state": None, "province": None,
+                           "city": None},
+           "isRemote": None}
+
+
+def test_bamboohr_reads_the_location_out_of_the_title():
+    """Every structured field is null — verified live — so the title is the only
+    place the country appears."""
+    assert bamboohr._location(JOB_BHR) == "Remote: Colombia - Costa Rica"
+
+
+def test_bamboohr_falls_back_to_the_structured_fields_when_filled():
+    job = {"jobOpeningName": "Backend Engineer",
+           "atsLocation": {"city": "Heredia", "state": None, "province": None,
+                           "country": "Costa Rica"}}
+    assert bamboohr._location(job) == "Heredia, Costa Rica"
+
+
+def test_bamboohr_filters_the_country_against_the_title():
+    """Filtering on `atsLocation.country`, which is the obvious thing to write,
+    would return zero postings forever and look like a company not hiring."""
+    assert bamboohr._in_countries(JOB_BHR, ["Costa Rica"])
+    assert not bamboohr._in_countries(JOB_BHR, ["Mexico"])
+
+
+def test_bamboohr_without_countries_keeps_everything():
+    assert bamboohr._in_countries(JOB_BHR, [])
+
+
+def test_bamboohr_scopes_the_id_by_company():
+    """BambooHR numbers postings per tenant, and they're small integers: "35"
+    would collide across companies instantly."""
+    assert bamboohr._job_url("gorillalogic", "186") == \
+        "https://gorillalogic.bamboohr.com/careers/186"
+    assert bamboohr._list_url("gorillalogic") == \
+        "https://gorillalogic.bamboohr.com/careers/list"
 
 
 # --- Greenhouse / Lever / Ashby -------------------------------------------

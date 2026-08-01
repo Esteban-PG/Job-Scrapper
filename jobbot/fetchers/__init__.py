@@ -21,6 +21,7 @@ entry in FETCHERS. Nothing else gets touched.
 
 from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
+from .bamboohr import fetch_bamboohr, fetch_gorillalogic
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
 from .ibm import fetch_ibm
@@ -56,6 +57,14 @@ FETCHERS = {
     "mastercard": lambda s: fetch_mastercard(
         countries=s.get("countries", ["Costa Rica"])),
     "bcg": lambda s: fetch_bcg(countries=s.get("countries", ["Costa Rica"])),
+    "gorillalogic": lambda s: fetch_gorillalogic(
+        countries=s.get("countries", ["Costa Rica"])),
+    # Any other BambooHR board: only the subdomain is needed.
+    "bamboohr": lambda s: fetch_bamboohr(
+        company=s["company"],
+        countries=s.get("countries", ["Costa Rica"]),
+        name=s.get("name"),
+    ),
     "moodys": lambda s: fetch_moodys(countries=s.get("countries", ["Costa Rica"])),
     "ibm": lambda s: fetch_ibm(
         countries=s.get("countries", ["Costa Rica"]),
