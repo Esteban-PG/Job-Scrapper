@@ -223,6 +223,11 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Microsoft — Eightfold.ai (PCSX) on its own domain. GET, no token. Careful:
+  # a misspelled country returns zero postings silently, not an error.
+  - type: microsoft
+    countries: ["Costa Rica"]
+
   # Gorilla Logic — BambooHR. The structured location fields come back null, so
   # the country is matched against the title text (see the fetcher's docstring).
   - type: gorillalogic

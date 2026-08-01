@@ -11,8 +11,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import (amazon, ats, bamboohr, equifax, ibm, jibe, phenom,
-                             radancy, workday)
+from jobbot.fetchers import (amazon, ats, bamboohr, eightfold, equifax, ibm,
+                             jibe, phenom, radancy, workday)
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -86,6 +86,43 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Eightfold / PCSX -----------------------------------------------------
+
+def test_eightfold_puts_the_country_last():
+    """`locations` reads "Country, State, City" — the opposite of every other
+    source — so it has to be flipped into the project's usual shape."""
+    assert eightfold._location(
+        {"locations": ["Costa Rica, San José, San José"]}) == "San José, Costa Rica"
+
+
+def test_eightfold_drops_the_multiple_locations_placeholder():
+    """Unset levels come back as that literal string. Left in, a posting would
+    read "Costa Rica, Multiple Locations, Multiple Locations"."""
+    assert eightfold._location(
+        {"locations": ["Costa Rica, Multiple Locations, Multiple Locations"]}) \
+        == "Costa Rica"
+
+
+def test_eightfold_tolerates_a_missing_location():
+    assert eightfold._location({}) == ""
+    assert eightfold._location({"locations": [""]}) == ""
+
+
+def test_eightfold_revalidates_the_country():
+    """Dropping `location` returns the global catalog (1807 postings), so the
+    server's filter is never trusted blindly."""
+    job = {"locations": ["Costa Rica, San José, San José"]}
+    assert eightfold._in_countries(job, ["Costa Rica"])
+    assert not eightfold._in_countries(job, ["Mexico"])
+    assert eightfold._in_countries(job, [])
+
+
+def test_eightfold_converts_the_epoch_to_a_date():
+    assert eightfold._posted({"postedTs": 1785352757}) == "2026-07-29"
+    assert eightfold._posted({}) == ""
+    assert eightfold._posted({"postedTs": "not a date"}) == ""
 
 
 # --- BambooHR -------------------------------------------------------------

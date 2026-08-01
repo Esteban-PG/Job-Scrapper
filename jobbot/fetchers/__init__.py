@@ -22,6 +22,7 @@ entry in FETCHERS. Nothing else gets touched.
 from .amazon import CATEGORIES_TECH, fetch_amazon
 from .ats import fetch_ashby, fetch_greenhouse, fetch_lever
 from .bamboohr import fetch_bamboohr, fetch_gorillalogic
+from .eightfold import fetch_eightfold, fetch_microsoft
 from .equifax import fetch_equifax
 from .generic_html import fetch_html
 from .ibm import fetch_ibm
@@ -59,6 +60,17 @@ FETCHERS = {
     "bcg": lambda s: fetch_bcg(countries=s.get("countries", ["Costa Rica"])),
     "gorillalogic": lambda s: fetch_gorillalogic(
         countries=s.get("countries", ["Costa Rica"])),
+    "microsoft": lambda s: fetch_microsoft(
+        countries=s.get("countries", ["Costa Rica"])),
+    # Any other Eightfold/PCSX board: site + the `domain=` parameter.
+    "eightfold": lambda s: fetch_eightfold(
+        site=s["site"],
+        domain=s["domain"],
+        countries=s.get("countries", ["Costa Rica"]),
+        id_prefix=s.get("id_prefix") or s["type"],
+        name=s.get("name"),
+        query=s.get("query", ""),
+    ),
     # Any other BambooHR board: only the subdomain is needed.
     "bamboohr": lambda s: fetch_bamboohr(
         company=s["company"],
