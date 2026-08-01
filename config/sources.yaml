@@ -216,6 +216,13 @@ sources:
   - type: hpe
     countries: ["Costa Rica"]
 
+  # West Monroe — Greenhouse. The API has no location filter (the board's UI
+  # filters in the browser), so the fetcher applies `countries` locally.
+  - type: greenhouse
+    company: westmonroe4
+    name: "West Monroe"
+    countries: ["Costa Rica"]
+
   # Mastercard — Phenom, classic payload (pageId + all_fields), en_us market.
   - type: mastercard
     countries: ["Costa Rica"]

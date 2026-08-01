@@ -11,7 +11,8 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from jobbot.fetchers import amazon, equifax, ibm, jibe, phenom, radancy, workday
+from jobbot.fetchers import (amazon, ats, equifax, ibm, jibe, phenom, radancy,
+                             workday)
 
 
 # --- Amazon ---------------------------------------------------------------
@@ -85,6 +86,34 @@ def test_equifax_does_not_repeat_an_identical_city_and_state():
         "<job><city>Heredia</city><state>Heredia</state>"
         "<country>Costa Rica</country></job>")
     assert equifax._location(job) == "Heredia, Costa Rica"
+
+
+# --- Greenhouse / Lever / Ashby -------------------------------------------
+
+def test_ats_filters_the_country_locally():
+    """None of the three filters by location on the server, so this is the only
+    thing standing between the orchestrator and the whole board — 141 postings
+    at West Monroe, of which 6 are Costa Rica's."""
+    assert ats._in_countries("Costa Rica", ["Costa Rica"])
+    assert not ats._in_countries("Chicago", ["Costa Rica"])
+
+
+def test_ats_keeps_multi_site_postings():
+    """Greenhouse writes several sites into one string."""
+    assert ats._in_countries("Boston; Chicago; San Jose, Costa Rica",
+                             ["Costa Rica"])
+
+
+def test_ats_is_case_insensitive_and_tolerates_no_location():
+    assert ats._in_countries("COSTA RICA", ["costa rica"])
+    assert not ats._in_countries("", ["Costa Rica"])
+    assert not ats._in_countries(None, ["Costa Rica"])
+
+
+def test_ats_without_countries_keeps_the_whole_board():
+    """`countries: []` is a valid choice, same as `location_hints: []`."""
+    assert ats._in_countries("Chicago", [])
+    assert ats._in_countries("Chicago", None)
 
 
 # --- IBM ------------------------------------------------------------------

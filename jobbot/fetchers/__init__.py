@@ -31,9 +31,14 @@ from .radancy import fetch_moodys, fetch_radancy
 from .workday import fetch_workday
 
 FETCHERS = {
-    "greenhouse": lambda s: fetch_greenhouse(s["company"], s.get("name")),
-    "lever": lambda s: fetch_lever(s["company"], s.get("name")),
-    "ashby": lambda s: fetch_ashby(s["company"], s.get("name")),
+    # These three have no server-side location filter; `countries` is applied
+    # locally by the fetcher. `countries: []` brings the whole board.
+    "greenhouse": lambda s: fetch_greenhouse(
+        s["company"], s.get("name"), s.get("countries", ["Costa Rica"])),
+    "lever": lambda s: fetch_lever(
+        s["company"], s.get("name"), s.get("countries", ["Costa Rica"])),
+    "ashby": lambda s: fetch_ashby(
+        s["company"], s.get("name"), s.get("countries", ["Costa Rica"])),
     "html": fetch_html,
     "equifax": lambda s: fetch_equifax(countries=s.get("countries", ["Costa Rica"])),
     "amazon": lambda s: fetch_amazon(
