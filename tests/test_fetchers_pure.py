@@ -516,6 +516,25 @@ def test_workday_finds_no_facet_for_an_absent_country():
     assert workday._resolve_country_facets(payload, ["Costa Rica"]) == (None, [])
 
 
+def test_workday_appends_the_country_when_the_text_omits_it():
+    """Datasite writes "CRI - San Jose" — the ISO-3, no country name. Without
+    this, `location_hints` only matches by luck of the city being listed."""
+    assert workday._location({"locationsText": "CRI - San Jose"}, ["Costa Rica"]) \
+        == "CRI - San Jose (Costa Rica)"
+
+
+def test_workday_leaves_the_location_alone_when_it_names_the_country():
+    assert workday._location({"locationsText": "Costa Rica"}, ["Costa Rica"]) \
+        == "Costa Rica"
+    assert workday._location({"locationsText": "Heredia, Costa Rica"},
+                             ["Costa Rica"]) == "Heredia, Costa Rica"
+
+
+def test_workday_falls_back_to_the_country_without_any_location_text():
+    assert workday._location({}, ["Costa Rica"]) == "Costa Rica"
+    assert workday._location({"locationsText": "CRI"}, []) == "CRI"
+
+
 def test_workday_pulls_the_job_code_from_bulletfields():
     assert workday._req_id({"bulletFields": ["R000154991"]}) == "R000154991"
 

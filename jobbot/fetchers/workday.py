@@ -113,6 +113,27 @@ def _resolve_country_facets(payload, countries):
     return None, []
 
 
+def _location(posting, countries):
+    """`locationsText` is whatever the tenant types, and that varies: P&G writes
+    "Costa Rica", Datasite writes "CRI - San Jose" — the ISO-3, with no country
+    name anywhere. Since `location_hints` matches on text, the second shape only
+    survives because "san jose" happens to be in the list; a posting in another
+    city would be dropped in silence.
+
+    The API already filtered by the country facet, so the country is known to be
+    right: it gets appended when the text doesn't already say it. Same treatment
+    `amazon.py` and `ibm.py` give their ISO-3 and ISO-2 location fields.
+    """
+    text = (posting.get("locationsText") or "").strip()
+    if not countries:
+        return text
+    lowered = text.lower()
+    missing = [c for c in countries if c.strip().lower() not in lowered]
+    if not missing or not text:
+        return text or ", ".join(countries)
+    return f"{text} ({' or '.join(missing)})"
+
+
 def _req_id(posting):
     """The job code (R000154991) comes in bulletFields. If it's missing, we fall
     back to externalPath, which is also stable."""
@@ -178,7 +199,7 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
             by_id[f"wd-{tenant}-{code}"] = {
                 "id": f"wd-{tenant}-{code}",
                 "title": p.get("title", ""),
-                "location": p.get("locationsText", ""),
+                "location": _location(p, list(countries) if countries else []),
                 "url": base + path if path else base,
                 "source": label,
                 # Workday gives the date as a relative string ("Posted 14 Days

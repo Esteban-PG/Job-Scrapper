@@ -71,6 +71,35 @@ filters:
     - '\bverification\b'
     - '\bvalidation\b'
     - '\be2e\b'
+    # IT / infrastructure operations.
+    #
+    # `\bit\b` is the one to watch: it also matches the English pronoun. Measured
+    # against 178 real postings it produced zero false positives — job titles
+    # just don't use "it" as a word — but if noise ever appears, this is the
+    # first line to pull. `\btechnical\b` was measured and rejected: it drags in
+    # "Instructional Designer - Technical Education". `\bsystems\b` and
+    # `\btechnician\b` are also out — "Systems Engineer" and "IT Technician" are
+    # already covered by `engineer` and `it`, while "Aqua Systems Technician" is
+    # not what you want.
+    - '\bit\b'
+    - '\badmin\b'
+    - '\badministrator\b'
+    - '\bsysadmin\b'
+    - '\bhelp.?desk\b'
+    - '\bservice desk\b'
+    - '\bnetwork\b'
+    - '\bincident\b'
+    - '\bendpoint\b'
+    - '\bdesktop\b'
+    - '\bnoc\b'
+    - '\bitil\b'
+    - '\bservicenow\b'
+    - '\bactive directory\b'
+    - '\bm365\b'
+    - '\bo365\b'
+    - '\bintune\b'
+    - '\bvmware\b'
+    - '\bcitrix\b'
     # Domains.
     - '\bsoftware\b'
     - '\bdata\b'
@@ -162,6 +191,24 @@ filters:
     - '\bback.?end\b'
     - '\bfront.?end\b'
     - '\bfull.?stack\b'
+    # IT ops that is unambiguously technical, so it survives a business
+    # category. `it`, `admin`, `administrator`, `incident` and `desktop` are
+    # deliberately NOT here: "Office Admin", "Executive Administrator" and an
+    # HR incident role would all be rescued past the gate by mistake.
+    - '\bsysadmin\b'
+    - '\bhelp.?desk\b'
+    - '\bservice desk\b'
+    - '\bnetwork\b'
+    - '\bendpoint\b'
+    - '\bnoc\b'
+    - '\bitil\b'
+    - '\bservicenow\b'
+    - '\bactive directory\b'
+    - '\bm365\b'
+    - '\bo365\b'
+    - '\bintune\b'
+    - '\bvmware\b'
+    - '\bcitrix\b'
     # `software` is deliberately absent: "Software Contract Negotiator / Data
     # Analyst" is a Sourcing & Procurement role. Real software titles carry
     # `engineer`, `developer` or `architect` anyway.
@@ -222,6 +269,16 @@ sources:
     company: westmonroe4
     name: "West Monroe"
     countries: ["Costa Rica"]
+
+  # Datasite — Workday (tenant/site both `datasite`, dc wd1). Config only.
+  # This tenant writes locations as "CRI - San Jose", so the fetcher appends
+  # the country name for `location_hints` to have something to match.
+  - type: workday
+    tenant: datasite
+    dc: wd1
+    site: "datasite"
+    countries: ["Costa Rica"]
+    name: "Datasite"
 
   # Experian — Attrax careers site, server-rendered HTML (no JSON endpoint).
   # Different company from the `equifax` source above, despite the names.
