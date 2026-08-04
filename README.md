@@ -12,21 +12,27 @@ The idea is to replace a pile of noisy email alerts — each with its own format
 its own cadence and its own noise — with **a single filtered feed**.
 
 ```
-23:15:48 INFO    equifax             13 jobs ·   3 new ·   1 notified
-23:15:51 INFO    pg                   4 jobs ·   0 new ·   0 notified
-23:15:54 INFO    cisco                3 jobs ·   1 new ·   1 notified
+23:15:48 INFO    equifax             10 jobs ·   3 new ·   1 notified
+23:15:51 INFO    pg                   3 jobs ·   0 new ·   0 notified
+23:15:54 INFO    cisco                4 jobs ·   1 new ·   1 notified
 23:15:57 INFO    hpe                 20 jobs ·   2 new ·   1 notified
-23:15:59 INFO    West Monroe          6 jobs ·   1 new ·   1 notified
-23:16:02 INFO    bcg                 13 jobs ·   2 new ·   0 notified
-23:16:05 INFO    mastercard           5 jobs ·   0 new ·   0 notified
-23:16:08 INFO    roche               16 jobs ·   4 new ·   2 notified
-23:16:10 INFO    moodys              21 jobs ·   3 new ·   2 notified
-23:16:13 INFO    Citi                 9 jobs ·   1 new ·   0 notified
-23:16:20 INFO    Workday              6 jobs ·   0 new ·   0 notified
-23:16:22 INFO    ibm                  5 jobs ·   1 new ·   1 notified
-23:16:25 INFO    teknowledge          6 jobs ·   0 new ·   0 notified
-23:16:28 INFO    amazon               7 jobs ·   1 new ·   1 notified
-23:16:28 INFO    total: 134 jobs · 19 new · 10 notified · 14/14 sources ok
+23:16:00 INFO    akamai              10 jobs ·   2 new ·   2 notified
+23:16:03 INFO    West Monroe          6 jobs ·   1 new ·   1 notified
+23:16:06 INFO    bcg                 13 jobs ·   2 new ·   0 notified
+23:16:09 INFO    mastercard           4 jobs ·   0 new ·   0 notified
+23:16:12 INFO    roche               16 jobs ·   4 new ·   2 notified
+23:16:15 INFO    experian            18 jobs ·   2 new ·   1 notified
+23:16:18 INFO    moodys              20 jobs ·   3 new ·   2 notified
+23:16:21 INFO    Citi                 9 jobs ·   1 new ·   0 notified
+23:16:24 INFO    Gorilla Logic       10 jobs ·   0 new ·   0 notified
+23:16:27 INFO    microsoft            7 jobs ·   1 new ·   1 notified
+23:16:30 INFO    oracle               2 jobs ·   0 new ·   0 notified
+23:16:34 INFO    Workday              6 jobs ·   0 new ·   0 notified
+23:16:38 INFO    Datasite             1 jobs ·   0 new ·   0 notified
+23:16:41 INFO    ibm                  5 jobs ·   1 new ·   1 notified
+23:16:44 INFO    teknowledge          6 jobs ·   0 new ·   0 notified
+23:16:47 INFO    amazon               8 jobs ·   1 new ·   1 notified
+23:16:47 INFO    total: 178 jobs · 24 new · 13 notified · 20/20 sources ok
 ```
 
 ```
@@ -48,19 +54,23 @@ company becomes a single YAML entry.
 | Greenhouse           | `boards.greenhouse.io/<company>`   | Public JSON API, filtered locally | ✅ verified live (West Monroe)             |
 | Lever                | `jobs.lever.co/<company>`          | Public JSON API               | template ready, no company yet                |
 | Ashby                | `jobs.ashbyhq.com/<company>`       | Public JSON API               | template ready, no company yet                |
-| Workday              | `<tenant>.<dc>.myworkdayjobs.com`  | JSON POST to `/wday/cxs/`     | ✅ verified live (P&G, Workday)                |
+| Workday              | `<tenant>.<dc>.myworkdayjobs.com`  | JSON POST to `/wday/cxs/`     | ✅ live (P&G, Workday, Datasite)               |
 | Phenom               | `/widgets` endpoint                | POST + CSRF token in a JWT    | ✅ live (P&G, Cisco, HPE, Roche, Mastercard, BCG) |
 | Radancy / TalentBrew | assets on `tbcdn.talentbrew.com`   | GET, HTML inside JSON or SSR  | ✅ verified live (Moody's, Citi)               |
 | Jibe / iCIMS         | `app.jibecdn.com`, `domain=…jibeapply.com` | 1 GET, no token       | ✅ verified live (TeKnowledge)                 |
 | Equifax              | its own XML feed                   | 1 GET to the feed             | ✅ verified live                               |
 | Amazon               | `amazon.jobs/api/jobs/search`      | 1 POST, no token              | ✅ verified live                               |
 | IBM                  | `www-api.ibm.com/search/api/v2`    | 1 POST, Elasticsearch-shaped  | ✅ verified live                               |
+| Oracle Recruiting Cloud | `*.fa.*.oraclecloud.com/hcmRestApi` | GET, Oracle "finder" syntax | ✅ live (Oracle, Akamai)                   |
+| Eightfold / PCSX     | `/api/pcsx/` endpoints             | 1 GET, no token               | ✅ verified live (Microsoft)                   |
+| BambooHR             | `<company>.bamboohr.com/careers`   | `careers/list` returns JSON   | ✅ verified live (Gorilla Logic)               |
+| Attrax               | `attrax-*` classes in the markup   | server-rendered HTML          | ✅ verified live (Experian)                    |
 | Heavy JS with no API | nothing in the Network tab         | Playwright                    | last resort, no cases yet                     |
 
-Fourteen companies, seven platforms. Five of them — Greenhouse, Workday, Phenom,
-Radancy and Jibe — are parameterized templates, so the next company on any of
-those is a YAML entry. Equifax, Amazon and IBM run their own thing and needed
-their own module.
+Twenty companies, eleven platforms. Nine of them — Greenhouse, Workday, Phenom,
+Radancy, Jibe, Oracle Recruiting Cloud, Eightfold, BambooHR and Attrax — are
+parameterized templates, so the next company on any of those is a YAML entry.
+Only Equifax, Amazon and IBM run something of their own and needed a module.
 
 **LinkedIn and Indeed are deliberately left out.** They actively block scraping
 and it goes against their terms of service. For those two, the sane way out is
@@ -179,7 +189,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-102 tests, ~0.15 s, and **none of them touch the network or Telegram**: they run
+121 tests, ~0.15 s, and **none of them touch the network or Telegram**: they run
 without credentials and offline. They cover the filters, the SQLite database
 (dedupe, alert threshold and the `source_health` migration), the message
 formatting and the pure functions of the fetchers — date parsing, location
@@ -249,8 +259,10 @@ sources:
 ```
 
 The boards that already have a preset are one line: `pg`, `cisco`, `hpe`,
-`roche`, `mastercard` and `bcg` on Phenom, `moodys` on Radancy, `teknowledge` on Jibe,
-plus `equifax`, `amazon` and `ibm`. For a new Phenom one you use `type: phenom` with the values you can see in
+`roche`, `mastercard` and `bcg` on Phenom; `moodys` on Radancy; `teknowledge` on
+Jibe; `oracle` and `akamai` on Oracle Recruiting Cloud; `microsoft` on Eightfold;
+`gorillalogic` on BambooHR; `experian` on Attrax; plus `equifax`, `amazon` and
+`ibm`. For a new Phenom one you use `type: phenom` with the values you can see in
 the POST to `/widgets` (`site`, `page_id`, `ref_num`, `id_prefix`); the full
 example is commented out in `config/sources.yaml`.
 
@@ -271,10 +283,10 @@ touching Python:
 
 ```yaml
 filters:
-  include: ['\bjunior\b', '\bdata\b', '\bqa\b', '\bdeveloper\b', ...]   # 56
+  include: ['\bjunior\b', '\bdata\b', '\bqa\b', '\bdeveloper\b', ...]   # 75
   exclude: ['\bsenior\b', '\bmanager\b', ...]                          #  9
   location_hints: ["remote", "costa rica", "heredia", ...]             #  9
-  strong_include: ['\bengineer\b', '\barchitect\b', '\bqa\b', ...]     # 28
+  strong_include: ['\bengineer\b', '\barchitect\b', '\bqa\b', ...]     # 42
   nontech_categories: ['accounting', 'finance', 'customer', ...]       # 15
 ```
 
@@ -290,7 +302,7 @@ Four gates, in this order:
 
 ### The category gate
 
-Ten of the thirteen sources carry the ATS's own `category`, which beats any amount
+Most of the twenty sources carry the ATS's own `category`, which beats any amount
 of word matching. It is deliberately **not** a hard block: companies file roles
 under the business unit they serve, so a real BI Developer sits under
 "Finance & Audit" and an HR internship sits under "Cloud". So a non-technical
@@ -555,6 +567,38 @@ JobCreator`), but the API is the simplest of them all: a POST with no token and
   `jdsource: facets` — so it needed nothing but its own values. One of its five
   Costa Rica postings is filed in Bogotá with Costa Rica among six sites, and
   arrives annotated rather than dropped, same as HPE.
+- **Oracle Recruiting Cloud filters by an opaque geography id, and the ids are
+  per tenant.** Unlike Workday's, which turned out to be global — the same Costa
+  Rica GUID works on P&G, Workday and Datasite. Verified by crossing them:
+  Akamai's Costa Rica id returns 0 on Oracle's tenant and Oracle's returns 0 on
+  Akamai's. The response's `locationsFacet` only lists the 18 most common
+  locations, so there is nothing to resolve the name against the way `workday.py`
+  does, and the ids have to be carried per source. A wrong id returns
+  `TotalJobsCount: 0`, indistinguishable from a company that isn't hiring.
+- **Eightfold (Microsoft) caps `num` at 10** whatever you ask for, while `count`
+  reports the real total — so a fetcher that trusts `num` silently keeps only the
+  first page. Its `locations` reads **"Country, State, City"**, country first,
+  the opposite of every other source, and unfilled levels come back as the
+  literal string "Multiple Locations".
+- **BambooHR (Gorilla Logic) returns every structured location field as null** —
+  `location`, all four of `atsLocation`, `isRemote`. The country lives only in
+  the title text ("… Remote: Colombia - Costa Rica, Full Time …"), so the obvious
+  implementation, filtering on `atsLocation.country`, returns zero postings
+  forever. The postings are painted server-side into the company's own domain,
+  but `<company>.bamboohr.com/careers/list` serves the same list as JSON — it is
+  the call the company's own server makes.
+- **Attrax (Experian) has no JSON endpoint at all**; the postings are rendered
+  into the search page and searching reloads the document. One of the few cases
+  where parsing HTML is the right answer rather than a last resort. `q` is a text
+  search rather than a country facet, and it does leak: revalidating locally
+  discarded a posting that wasn't in Costa Rica.
+- **Workday's `locationsText` is whatever the tenant types.** P&G writes
+  "Costa Rica", Datasite writes "CRI - San Jose" — the ISO-3, no country name
+  anywhere. The second shape only survived the location gate because "san jose"
+  happens to be in `location_hints`; a posting in another city would have been
+  dropped in silence. Since the country facet already filtered, the country is
+  appended when the text omits it, the same treatment `amazon.py` and `ibm.py`
+  give their ISO-3 and ISO-2 fields.
 - **IBM** runs its own unified search endpoint, Elasticsearch-shaped, behind
   opaque field names (`field_keyword_05` is the country, `_08` the business area,
   `_18` the level, `_19` the city). An unknown country returns **`total: 0`, not
@@ -573,22 +617,32 @@ boards change; these are one day's snapshot.
 
 | Source                       | Fetched | Pass | Notes                                        |
 | ---------------------------- | ------: | ---: | -------------------------------------------- |
-| Equifax (XML feed)           |      13 |    2 | mostly Accounting, cut by the category gate  |
-| P&G (Phenom)                 |       4 |    0 | only consumer-relations roles                |
-| Cisco (Phenom)               |       3 |    2 | out of ~1000 globally                        |
+| Moody's (Radancy, JSON)      |      20 |   11 | out of 251 globally                          |
+| Roche (Phenom CareerConnect) |      16 |    9 | out of 1230 globally                         |
 | HPE (Phenom)                 |      20 |    8 | out of ~1060 globally, several multi-site    |
-| Mastercard (Phenom)          |       5 |    0 | all Senior or Manager, advisory org          |
-| BCG (Phenom)                 |      13 |    1 | out of 879 globally; 7 of 13 are Senior      |
-| Roche (Phenom CareerConnect) |      16 |    9 | out of 1230 globally; best signal of the lot |
-| West Monroe (Greenhouse)     |       6 |    1 | 6 of 141 on the board; 5 are Senior          |
-| Moody's (Radancy, JSON)      |      21 |   11 | out of 251 globally                          |
-| Citi (Radancy, SSR)          |       9 |    2 | server-rendered, newer `sr-` markup          |
-| Workday (tenant `workday`)   |       6 |    1 | out of 346 globally                          |
+| Akamai (Oracle Recruiting)   |      10 |    8 | best ratio of the lot; mostly level II       |
+| Amazon (own ATS)             |       8 |    5 | 73 unfiltered by category                    |
+| Experian (Attrax)            |      18 |    4 | server-rendered; `q` is a text search        |
 | IBM (own search API)         |       5 |    4 | 2 of the 4 are internships filed under Cloud |
+| Cisco (Phenom)               |       4 |    2 | out of ~1000 globally                        |
+| Citi (Radancy, SSR)          |       9 |    2 | server-rendered, newer `sr-` markup          |
+| Equifax (XML feed)           |      10 |    1 | mostly Accounting, cut by the category gate  |
+| West Monroe (Greenhouse)     |       6 |    1 | 6 of 141 on the board; 5 are Senior          |
+| Microsoft (Eightfold)        |       7 |    1 | out of 1807 globally                         |
+| Workday (tenant `workday`)   |       6 |    1 | out of 346 globally                          |
+| Gorilla Logic (BambooHR)     |      10 |    1 | all remote CR+CO; 9 are Senior or Lead       |
+| BCG (Phenom)                 |      13 |    1 | out of 879 globally; 7 of 13 are Senior      |
+| Oracle (Oracle Recruiting)   |       2 |    1 | out of 2321 globally                         |
+| Datasite (Workday)           |       1 |    1 | out of 38 globally                           |
+| P&G (Phenom)                 |       3 |    0 | only consumer-relations roles                |
+| Mastercard (Phenom)          |       4 |    0 | all Senior or Manager, advisory org          |
 | TeKnowledge (Jibe/iCIMS)     |       6 |    0 | all Customer Support                         |
-| Amazon (own ATS)             |       7 |    5 | 73 unfiltered by category                    |
-| **Total**                    | **134** | **46** |                                            |
+| **Total**                    | **178** | **61** |                                            |
 | Lever / Ashby                |       — |    — | ⚠️ code ready, never run live                |
+
+The split is worth reading: the sources that yield are engineering and IT
+delivery centres, and the ones that yield nothing are consultancies and BPO.
+That is a property of the companies, not of the filter — see `CANDIDATES.md`.
 
 ## Stack
 
@@ -616,14 +670,18 @@ jobbot/
     useragents.py         the bot's two User-Agents, and why there are two
     ats.py                Greenhouse, Lever, Ashby (public API, local country filter)
     amazon.py             amazon.jobs (POST with no token)
+    attrax.py             Attrax careers sites (server-rendered) + Experian
+    bamboohr.py           BambooHR careers/list + Gorilla Logic
+    eightfold.py          Eightfold/PCSX + Microsoft preset
     equifax.py            XML feed
     ibm.py                IBM's own search endpoint (Elasticsearch-shaped)
     jibe.py               Jibe/iCIMS + TeKnowledge preset
-    phenom.py             Phenom (JWT CSRF) + P&G/Cisco/HPE/Roche/Mastercard
+    oraclecloud.py        Oracle Recruiting Cloud + Oracle, Akamai presets
+    phenom.py             Phenom (JWT CSRF) + 6 presets incl. Roche, BCG
     radancy.py            Radancy/TalentBrew (JSON or SSR) + Moody's, Citi
     workday.py            Workday (CXS POST + facets)
     generic_html.py       last resort: CSS selector
-tests/                    102 tests, no network (see tests/README.md)
+tests/                    121 tests, no network (see tests/README.md)
 .github/workflows/
   job-alerts.yml          the bot, every 30 min (+ manual dry-run button)
   telegram-test.yml       manual-only: proves the Secrets reach Telegram
