@@ -266,6 +266,15 @@ def test_ats_without_countries_keeps_the_whole_board():
     assert ats._in_countries("Chicago", None)
 
 
+def test_ats_matches_a_city_listed_alongside_the_country():
+    """Konrad writes 22 of its 23 postings as "Costa Rica" and one as just
+    "San José". Listing the city in `countries` is what keeps that one, and the
+    accent must not be what decides it — both spellings are configured."""
+    assert ats._in_countries("San José", ["Costa Rica", "San José", "San Jose"])
+    assert ats._in_countries("San Jose", ["Costa Rica", "San José", "San Jose"])
+    assert not ats._in_countries("San José", ["Costa Rica"])
+
+
 # --- IBM ------------------------------------------------------------------
 
 def test_ibm_uses_the_jobid_and_not_the_hash_as_id():
@@ -508,12 +517,76 @@ def test_workday_returns_the_parameter_name_it_matched():
     assert param == "Location_Country" and ids == ["mx"]
 
 
-def test_workday_finds_no_facet_for_an_absent_country():
+def test_workday_reports_the_facet_even_when_the_country_is_absent():
+    """The facet IS there and readable — Costa Rica just isn't among its values.
+    Returning `(None, [])` here, which is what this did, is what made Datasite
+    look like a tenant with an unknown facet name and sent the fetcher off to
+    fetch the global catalog."""
     payload = {"facets": [{"values": [{
         "facetParameter": "locationCountry",
         "values": [{"descriptor": "Mexico", "id": "x"}],
     }]}]}
+    assert workday._resolve_country_facets(payload, ["Costa Rica"]) == \
+        ("locationCountry", [])
+
+
+def test_workday_finds_no_facet_at_all():
+    """The genuinely unknown case, and the only one that should fall back to
+    fetching everything: nothing in the response is a country facet we read."""
+    payload = {"facets": [{"facetParameter": "remoteType",
+                           "values": [{"descriptor": "Remote", "id": "r"}]}]}
     assert workday._resolve_country_facets(payload, ["Costa Rica"]) == (None, [])
+
+
+def test_workday_facet_covering_the_catalog_makes_an_absence_conclusive():
+    """Datasite's real shape: 7 countries summing to the catalog's 37. Costa
+    Rica not being there means no openings, not a broken filter."""
+    payload = {"total": 37, "facets": [{
+        "facetParameter": "Location_Country",
+        "values": [{"descriptor": "United States of America", "count": 26},
+                   {"descriptor": "Germany", "count": 2},
+                   {"descriptor": "United Kingdom", "count": 2},
+                   {"descriptor": "Poland", "count": 2},
+                   {"descriptor": "Japan", "count": 2},
+                   {"descriptor": "Italy", "count": 2},
+                   {"descriptor": "Czechia", "count": 1}],
+    }]}
+    assert workday._facet_covers_catalog(payload, "Location_Country")
+
+
+def test_workday_facet_counts_may_exceed_the_total():
+    """A multi-country posting is counted once per country, so P&G reports 692
+    across its countries for 687 postings. Testing `== total` would call that
+    truncated and throw away the conclusion."""
+    payload = {"total": 687, "facets": [{"values": [{
+        "facetParameter": "locationCountry",
+        "values": [{"descriptor": "Mexico", "count": 400},
+                   {"descriptor": "Ireland", "count": 292}],
+    }]}]}
+    assert workday._facet_covers_catalog(payload, "locationCountry")
+
+
+def test_workday_truncated_facet_proves_nothing():
+    """A sum below the total is the tell that the list only shows the most
+    common values — then an absent country is not evidence and the fetcher has
+    to fall back on fetching everything."""
+    payload = {"total": 500, "facets": [{
+        "facetParameter": "Location_Country",
+        "values": [{"descriptor": "Mexico", "count": 30}],
+    }]}
+    assert not workday._facet_covers_catalog(payload, "Location_Country")
+    assert not workday._facet_covers_catalog(payload, "locationCountry")
+
+
+def test_workday_does_not_invent_the_country_when_nothing_filtered():
+    """The bug this pairs with: on the fallback path the postings are the global
+    catalog, so stamping "(Costa Rica)" onto a New York job walks it straight
+    past `location_hints`."""
+    ny = {"locationsText": "USA - NY - New York City"}
+    assert workday._location(ny, ["Costa Rica"], filtered=False) == \
+        "USA - NY - New York City"
+    assert workday._location(ny, ["Costa Rica"], filtered=True) == \
+        "USA - NY - New York City (Costa Rica)"
 
 
 def test_workday_appends_the_country_when_the_text_omits_it():

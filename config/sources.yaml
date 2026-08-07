@@ -270,6 +270,30 @@ sources:
     name: "West Monroe"
     countries: ["Costa Rica"]
 
+  # Konrad — Greenhouse too, board `konradgroup`. Config only.
+  #
+  # The careers site does NOT look like Greenhouse: konrad.com is a TanStack
+  # Start app that calls its own `/_serverFn/<hash>` endpoints with a Seroval
+  # payload, and those reject a request made outside the browser (403/500). None
+  # of that matters — it's a proxy. The posting ids it sends around are
+  # Greenhouse ids, and the public board answers with the same 23 Costa Rica
+  # postings the site shows, no cookies involved. Verified by crossing the ids:
+  # 6622525003 (Associate Consultant), 7530792003 (Data Engineer) and
+  # 7766038003 (Full Stack Developer) are the same on both sides, and
+  # `absolute_url` already points back at konrad.com/careers/job/<id>.
+  #
+  # ⚠️ 22 of the 23 say "Costa Rica", but Full Stack Developer says just
+  # "San José" — no country. Hence the city in `countries`: without it that one
+  # posting disappears silently, which is the failure this project keeps warning
+  # about. Both spellings are listed because the board writes the accented one
+  # today and nothing stops it from normalizing. The cost is that a San Jose,
+  # California posting would slip through; Konrad's US office is New York, and a
+  # stray notification is cheaper than a role never seen.
+  - type: greenhouse
+    company: konradgroup
+    name: "Konrad"
+    countries: ["Costa Rica", "San José", "San Jose"]
+
   # Datasite — Workday (tenant/site both `datasite`, dc wd1). Config only.
   # This tenant writes locations as "CRI - San Jose", so the fetcher appends
   # the country name for `location_hints` to have something to match.

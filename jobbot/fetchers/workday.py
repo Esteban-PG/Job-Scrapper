@@ -93,8 +93,22 @@ def _resolve_country_facets(payload, countries):
     `locationCountry`, while Workday's own tenant exposes `Location_Country` as
     a flat top-level facet. Guessing one name is what made this template fall
     back to fetching the whole world on that second tenant.
+
+    Three outcomes, and telling the last two apart is the whole point:
+
+        ("locationCountry", [ids])  the country is in the facet -> filter by it
+        ("locationCountry", [])     the facet exists, the country is NOT in it
+        (None, [])                  no facet we know how to read
+
+    The middle one means "this tenant has no openings there"; the last one means
+    "we don't know how to ask". Collapsing them into `(None, [])`, which is what
+    this used to do, made a company with zero local openings look exactly like a
+    tenant with an unknown facet name — and the caller answers that by fetching
+    the global catalog.
     """
     wanted = {c.strip().lower() for c in countries}
+    # A country facet we recognized, even if none of its values matched.
+    known = None
 
     for facet in payload.get("facets", []):
         param = facet.get("facetParameter")
@@ -102,6 +116,7 @@ def _resolve_country_facets(payload, countries):
             ids = _matching_ids(facet.get("values"), wanted)
             if ids:
                 return param, ids
+            known = known or param
         # Nested: a group of subgroups (Country / State / City).
         for group in facet.get("values") or []:
             gparam = group.get("facetParameter")
@@ -109,23 +124,53 @@ def _resolve_country_facets(payload, countries):
                 ids = _matching_ids(group.get("values"), wanted)
                 if ids:
                     return gparam, ids
+                known = known or gparam
 
-    return None, []
+    return known, []
 
 
-def _location(posting, countries):
+def _facet_covers_catalog(payload, param):
+    """Whether the country facet `param` accounts for the entire catalog, which
+    is what makes "the country isn't in it" mean "there are no openings there".
+
+    Workday counts a multi-country posting once per country, so a complete
+    breakdown sums to the catalog's `total` **or more** — P&G reports 692 across
+    49 countries for 687 postings. A sum *below* the total is the tell that the
+    list is truncated to the most common values, the way Oracle's
+    `locationsFacet` is, and then an absent country proves nothing and the
+    caller has to fall back on fetching everything.
+    """
+    for facet in payload.get("facets", []):
+        for group in [facet] + list(facet.get("values") or []):
+            if group.get("facetParameter") == param:
+                counted = sum(v.get("count") or 0
+                              for v in group.get("values") or [])
+                return counted >= (payload.get("total") or 0)
+    return False
+
+
+def _location(posting, countries, filtered=True):
     """`locationsText` is whatever the tenant types, and that varies: P&G writes
     "Costa Rica", Datasite writes "CRI - San Jose" — the ISO-3, with no country
     name anywhere. Since `location_hints` matches on text, the second shape only
     survives because "san jose" happens to be in the list; a posting in another
     city would be dropped in silence.
 
-    The API already filtered by the country facet, so the country is known to be
-    right: it gets appended when the text doesn't already say it. Same treatment
+    When the API filtered by the country facet the country is known to be right,
+    so it gets appended if the text doesn't already say it. Same treatment
     `amazon.py` and `ibm.py` give their ISO-3 and ISO-2 location fields.
+
+    ⚠️ `filtered=False` is not a detail — it's the whole safety net. On the
+    fallback path nothing filtered by country, so the postings are the global
+    catalog and the country is a *guess*. Appending it anyway stamps
+    "(Costa Rica)" onto a job in New York, and since `location_hints` matches on
+    that same text the location gate can no longer catch it: a soft failure
+    (foreign postings the gate would drop) turns into notifications that are
+    confidently wrong. Seen live on Datasite. Unfiltered postings keep the
+    location the tenant actually wrote.
     """
     text = (posting.get("locationsText") or "").strip()
-    if not countries:
+    if not countries or not filtered:
         return text
     lowered = text.lower()
     missing = [c for c in countries if c.strip().lower() not in lowered]
@@ -167,6 +212,16 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
         param, ids = _resolve_country_facets(first, countries)
         if ids:
             applied = {param: ids}
+        elif param and _facet_covers_catalog(first, param):
+            # The tenant publishes a country facet, it accounts for every
+            # posting, and the country isn't in it. That is an answer, not a
+            # failure: there are no openings there. Returning [] is the honest
+            # result — falling through would fetch the global catalog to have
+            # the orchestrator discard all of it.
+            print(f"[info] Workday {label}: {', '.join(countries)} not in the "
+                  f"'{param}' facet, which covers the whole catalog — no "
+                  f"openings there")
+            return []
         else:
             # Worth shouting about: falling through here means fetching the
             # global catalog, and since `location_hints` includes "remote" a
@@ -199,7 +254,8 @@ def fetch_workday(tenant, site, dc="wd5", countries=("Costa Rica",),
             by_id[f"wd-{tenant}-{code}"] = {
                 "id": f"wd-{tenant}-{code}",
                 "title": p.get("title", ""),
-                "location": _location(p, list(countries) if countries else []),
+                "location": _location(p, list(countries) if countries else [],
+                                      filtered=bool(applied)),
                 "url": base + path if path else base,
                 "source": label,
                 # Workday gives the date as a relative string ("Posted 14 Days

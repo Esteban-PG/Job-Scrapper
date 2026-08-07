@@ -8,6 +8,7 @@ data/seen_jobs.db
 # Working notes: they're for me, not for whoever visits the repo.
 TODO.md
 CANDIDATES.md
+HOW-IT-WORKS.md
 
 .venv/
 __pycache__/
